@@ -1,4 +1,4 @@
-# pathogen_host_interaction_project
+# pathogen_host_interaction_pipeline
 
 Hello all! This is a project that I am currently doing for a research scholarship.
 
