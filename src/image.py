@@ -109,7 +109,7 @@ def label_images_otsu(path, isCell):
         
         # Place labels on segmented areas
         labelImg = measure.label(labelImg, connectivity=image.ndim) 
-        
+
         # plt.imshow(labelImg)
         # plt.show()
         images.append((labelImg, image))
@@ -173,8 +173,27 @@ def get_intersection_information(pathogenImages, cellImages):
     intracellularPathogens = []
     for i in range(0, len(labelledPathogen)):
         joinedLabels = segmentation.join_segmentations(labelledPathogen[i], labelledCell[i])
+        
         filtered = (joinedLabels == 3).astype(int)
         intracellularPathogens.append(filtered)
+
+    # Join intracellular pathogens with the original pathogen labels, and then find regions with
+    # mean_intensity == 1.0 (i.e. 100% overlap). Record the labels that have mean intensity
+    # 1.0 in an array, and filter these into a new image.
+    for i in range(0, len(labelledCell)):
+        props = measure.regionprops(pathogenImages[i][0], intensity_image=intracellularPathogens[i])
+        fullyIntracellular = []
+        for prop in props:
+            if (prop['intensity_mean'] == 1.0):
+                fullyIntracellular.append(prop['label'])
+        # Now, filter out the fully intracellular labels from pathogenImages[i][0], and
+        # then convert each image to having only two labels; the background (0), and
+        # pathogen labels (1)
+        truthTable = (np.in1d(pathogenImages[i][0], fullyIntracellular)).reshape(
+                        len(pathogenImages[i][0]),
+                        len(pathogenImages[i][0][0])
+                     )
+        intracellularPathogens[i] = (truthTable == True).astype(int)
 
     # Now, rejoin the intracellularPathogens with the corresponding cell labels, so that
     # we can begin counting the number of infected cells and uninfected cells.
@@ -224,14 +243,14 @@ def get_intersection_information(pathogenImages, cellImages):
                 if (isCell):
                     # If this is a cell, then record the number of pathogens within it as
                     # well
-                    extract_cell_info(cellInfo, cellImages[i], label, len(adjacency))
+                    extract_cell_info(cellInfo, cellImages[i][1], label, len(adjacency))
                 else:
-                    extract_pathogen_info(pathogenInfo, pathogenImages[i], label)
+                    extract_pathogen_info(pathogenInfo, pathogenImages[i][1], label)
             elif (len(adjacency) == 1):
                 if (adjacency[0] == 0):
-                    extract_cell_info(cellInfo, cellImages[i], label, 0)
+                    extract_cell_info(cellInfo, cellImages[i][1], label, 0)
                 else:
-                    extract_pathogen_info(pathogenInfo, pathogenImages[i], label)
+                    extract_pathogen_info(pathogenInfo, pathogenImages[i][1], label)
     return {'pathogenInfo': pathogenInfo, 'cellInfo': cellInfo}
 
 # The function below takes in a path, and simply obtains the file names in that path.
