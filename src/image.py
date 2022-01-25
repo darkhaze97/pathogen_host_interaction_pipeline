@@ -1,9 +1,4 @@
 import os
-import tensorflow as tf
-from tensorflow import keras
-from keras.models import Sequential
-from keras.layers import Dense, Flatten, Conv2D, MaxPooling2D, Dropout
-from tensorflow.keras import layers
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
@@ -82,15 +77,15 @@ def label_images_otsu(path, isCell):
     pathNames = obtain_file_names(path)
     for imagePath in pathNames:
         image = cv2.imread(imagePath)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        greyImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
         # Before applying segmentation, check if this is a cell image. If it is, use
         # Contrast Limited Adaptive historgram equalisation (CLAHE) to improve contrast
         # and therefore improve segmentation.
         if (isCell):
-            image = apply_clahe(image)
+            greyImage = apply_clahe(greyImage)
 
-        ret, alteredImg = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        ret, alteredImg = cv2.threshold(greyImage, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         
         # Remove labels that are at the edges, since they have segments outside of the field of view
         # that we cannot analyse.
@@ -108,7 +103,7 @@ def label_images_otsu(path, isCell):
         labelImg = morphology.remove_small_holes(labelImg, 1000000)
         
         # Place labels on segmented areas
-        labelImg = measure.label(labelImg, connectivity=image.ndim) 
+        labelImg = measure.label(labelImg, connectivity=greyImage.ndim) 
 
         # plt.imshow(labelImg)
         # plt.show()

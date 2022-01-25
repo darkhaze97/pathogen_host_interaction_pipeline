@@ -1,6 +1,8 @@
 import PySimpleGUI as sg
-from PIL import Image
 import cv2
+import pickle
+
+from visualize import visualize
 
 from image import image_analysis
 # class SelectPath(ed.Component):
@@ -55,6 +57,7 @@ def main():
         event, values = window.read()
         if (event == sg.WIN_CLOSED):
             break
+            exit(0)
         elif (event == 'Confirm'):
             nucleiPath = values['#nucleiimagepath']
             pathogenPath = values['#pathogenimagepath']
@@ -65,66 +68,44 @@ def main():
         
     info = image_analysis(nucleiPath, pathogenPath, cellPath)
     
-    pathogenColumn = [
+    savePath = ''
+    
+    saveComponent = [
         [
-            sg.Text('Pathogen information')
+            sg.Text('Choose a file name.'),
+            sg.In(size=(25,1), enable_events=True, key='#filename')
+        ],
+        [
+            sg.Text('Select a path to save the data.'),
+            sg.In(size=(25,1), enable_events=True, key='#savepath'),
+            sg.FolderBrowse()
+        ],
+        [
+            sg.Button('Confirm')
         ]
     ]
-    
-    for i in range(0, len(info['pathogenInfo']['area'])):
-        pathogenColumn.append([sg.Text(form_pathogen_info(info['pathogenInfo'],
-                                                          i)),
-                               sg.Image(reform_image_from_array(info['pathogenInfo']['image'][i],
-                                                                info['pathogenInfo']['bounding_box'][i]),
-                                        size = (200, 200)
-                               )])
     
     layout = [
         [
-            sg.Column(pathogenColumn)
+            sg.Column(saveComponent)
         ]
     ]
-    
     window = sg.Window(title='Pipeline', layout=layout)
+    
     while True:
         event, values = window.read()
         if (event == sg.WIN_CLOSED):
+            break
+            exit(0)
+        elif (event == 'Confirm'):
+            savePath = values['#savepath'] + '/' + values['#filename']
+            with open(savePath, 'wb') as f:
+                pickle.dump(info, f)
             break
     
     window.close()
+            
+    visualize(info)
     
-    cellColumn = [
-        [
-            sg.Text('Cell information')
-        ]
-    ]
-    
-    # for i in range(0, len(info['cellInfo']['area'])):
-    #     cellColumn.append([sg.Image(reform_image_from_array(info['cellInfo']['image'][i]),
-    #                                 size = (200, 200))
-    #     ])
-    cellColumn.append([sg.Image(reform_image_from_array(info['cellInfo']['image'][0],
-                                                        info['cellInfo']['bounding_box'][0]))])
-    layout2 = [
-        [
-            sg.Column(cellColumn)
-        ]
-    ]
-    
-    window = sg.Window(title='Pipeline', layout=layout2)
-    while True:
-        event, values = window.read()
-        if (event == sg.WIN_CLOSED):
-            break
-    
-
-def form_pathogen_info(info, index):
-    return ('Pathogen number: ' + str(index) + '\nArea: ' + str(info['area'][index]))
-
-def reform_image_from_array(imageArray, bbox):
-    cropImage = imageArray[bbox[0]:bbox[2], bbox[1]:bbox[3]]
-    success, encoded_image = cv2.imencode('.png', cropImage)
-    return encoded_image.tobytes()
-
 if __name__ == '__main__':
     main()
