@@ -96,7 +96,6 @@ def main():
         event, values = window.read()
         if (event == sg.WIN_CLOSED):
             break
-            exit(0)
         elif (event == 'Confirm'):
             savePath = values['#savepath'] + '/' + values['#filename']
             with open(savePath, 'wb') as f:

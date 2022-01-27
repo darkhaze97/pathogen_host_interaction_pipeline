@@ -5,6 +5,7 @@ import cv2
 from skimage import measure, segmentation, morphology, future
 from skimage.segmentation import clear_border
 import pandas as pd
+import cProfile
 plt.style.use('fivethirtyeight')
 
 
@@ -21,11 +22,12 @@ def image_analysis(nucleiPath, pathogenPath, cellPath):
     # Scan through the nuclei, and correct...
     nucleiImages = label_nuclei_images(nucleiPath)
     pathogenImages = label_pathogen_images(pathogenPath)
-    cellImages = label_cell_images(cellPath)
+    cellImages = label_cell_images(cellPath, nucleiImages)
     
+    intersection_info = get_intersection_information(pathogenImages, cellImages)
     # Generate information about whether the cells are infected, and the number of
     # pathogens in the cell. In addition, generate information on the pathogens.
-    intersection_info = get_intersection_information(pathogenImages, cellImages)
+    cProfile.runctx('get_intersection_information(pathogenImages, cellImages)', {'get_intersection_information': get_intersection_information}, {'pathogenImages': pathogenImages, 'cellImages': cellImages}, filename='report.txt' )
     
     # Return the labelled images of the nuclei, pathogen and cells. In addition, return
     # information about the intersection between the pathogens and cells.
@@ -44,20 +46,24 @@ def image_analysis(nucleiPath, pathogenPath, cellPath):
 # returns:
 #   - label_images_otsu(path): A list of the labelled images.
 def label_nuclei_images(path):
-    return label_images_otsu(path, False)
+    return label_images_otsu(path, None)
 
 # TODO
 def label_pathogen_images(path):
-    return label_images_otsu(path, False)
+    return label_images_otsu(path, None)
 
 # This function is to help segment the cell images. It takes in a path to the
-# cell images.
+# cell images and nuclei images. The nuclei images help fill in holes in the cell.
+# Note that for this case, the nuclei segmentation must have occurred first.
 # Arguments:
 #   - path (string): The path to the directory with the cell images.
+#   - nucleiImages list<(labelled images (list), images (list))>: The path to the
+#                                                                 directory with the
+#                                                                 nuclei images.
 # returns:
 #   - label_images_huang(path): A list of the labelled cell images.
-def label_cell_images(path):
-    return label_images_otsu(path, True)
+def label_cell_images(path, nucleiImages):
+    return label_images_otsu(path, nucleiImages)
 
 # The function below takes in a path, and scans through the images to
 # then return a list of the labelled images. This function is made to reduce
@@ -71,8 +77,11 @@ def label_cell_images(path):
 # Resources used: 
 #   - https://www.geeksforgeeks.org/python-thresholding-techniques-using-opencv-set-3-otsu-thresholding/
 #   - https://www.youtube.com/watch?v=qfUJHY3ku9k
-def label_images_otsu(path, isCell):
+def label_images_otsu(path, nucleiImages):
     images = []
+    # i is the index to calculate which nucleiImage we are up to (if we are currently
+    # attempting to label the cell images.)
+    i = 0
     # Obtain the file names in the directory dictated by path
     pathNames = obtain_file_names(path)
     for imagePath in pathNames:
@@ -82,33 +91,61 @@ def label_images_otsu(path, isCell):
         # Before applying segmentation, check if this is a cell image. If it is, use
         # Contrast Limited Adaptive historgram equalisation (CLAHE) to improve contrast
         # and therefore improve segmentation.
-        if (isCell):
+        if (not nucleiImages == None):
             greyImage = apply_clahe(greyImage)
 
         ret, alteredImg = cv2.threshold(greyImage, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         
+        # If nucleiImages are provided, combine the labelImg with the nucleiLabel.
+        # Note that nucleiImage[0] corresponds to the nucleiLabel that was accessed first.
+        if (not nucleiImages == None):
+            # # Relabel the background to be (0), and all other labels be (1) in nucleiImags[i][0]
+            # relabelNuclei = (nucleiImages[i][0] > 0).astype(int)
+            # labelCellInitial = (alteredImg > 0).astype(int)
+            # # relabelCell = (labelImg == True).astype(int)
+            # # Join the labels of the cells and nuclei.
+            # joinedLabels = segmentation.join_segmentations(relabelNuclei, labelCellInitial)
+            
+            # # Make the background (0) and other labels be (1) again.
+            # alteredImg = (joinedLabels > 0).astype(int)
+            alteredImg = combine_cell_nuclei_label(alteredImg, nucleiImages[i][0])
+            i = i + 1
+        
+        # Convert the alteredImg into a boolean array. Then we are able to remove 
+        # small objects.
+        labelImg = alteredImg > 0
+        
         # Remove labels that are at the edges, since they have segments outside of the field of view
         # that we cannot analyse.
-        alteredImg = clear_border(alteredImg)
+        labelImg = clear_border(labelImg)
         
         # Remove small objects in the altered image. The minimal size will be based on if the
         # image was a pathogen, cell or nucleus. A larger minimal value is needed for
         # the cell, since there can be a lot of noise in these photos compared to the nuclei
         # or pathogens.
-        labelImg = alteredImg > 0
-        labelImg = morphology.remove_small_objects(labelImg, 2000) if isCell \
+        labelImg = morphology.remove_small_objects(labelImg, 2000) if (not nucleiImages == None) \
                         else morphology.remove_small_objects(labelImg, 100)
         
         # Then, remove holes that are within labels.
-        labelImg = morphology.remove_small_holes(labelImg, 1000000)
+        labelImg = morphology.remove_small_holes(labelImg, 10000)
         
-        # Place labels on segmented areas
+        # Place unique labels on segmented areas
         labelImg = measure.label(labelImg, connectivity=greyImage.ndim) 
 
-        # plt.imshow(labelImg)
-        # plt.show()
+        plt.imshow(labelImg)
+        plt.show()
         images.append((labelImg, image))
     return images
+    
+def combine_cell_nuclei_label(cellLabel, nucleiLabel):
+    relabelNuclei = (nucleiLabel > 0).astype(int)
+    cellLabel = (cellLabel > 0).astype(int)
+    # relabelCell = (labelImg == True).astype(int)
+    # Join the labels of the cells and nuclei.
+    joinedLabels = segmentation.join_segmentations(relabelNuclei, cellLabel)
+    
+    # Make the background (0) and other labels be (1) again, and return.
+    return (joinedLabels > 0).astype(int)
 
 # The function below applies contrast limited adaptive histogram equalisation (CLAHE)
 # and returns the edited image.
@@ -298,3 +335,6 @@ def extract_cell_info(cellInfo, ogImage, regionInfo, pathogenNum):
     cellInfo['area'].append(regionInfo.area)
     cellInfo['image'].append(ogImage)
     cellInfo['pathogen_number'].append(pathogenNum)
+
+if __name__ == '__main__':
+    image_analysis("Images/Nuclei", "Images/Pathogen", "Images/Cell")

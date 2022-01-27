@@ -6,12 +6,36 @@ from tensorflow.nn import local_response_normalization
 from tensorflow import keras
 from keras.models import Sequential
 from keras.layers import Dense, Flatten, Conv2D, MaxPooling2D, Dropout, BatchNormalization
+from keras.preprocessing.image import ImageDataGenerator
+from keras.applications import vgg16
+from keras.optimizers import Adam
 from tensorflow.keras import layers
 import numpy as np
 import cv2
 
-# pathNames = []
-# image = cv2.imread('./data/recruit.png')
+# The image preprocessing code was adapted from:
+# https://www.youtube.com/watch?v=_L2uYfVV48I&list=PLZbbT5o_s2xrwRnXk_yCPtnqqo4_u2YGL&index=11
+print(os.getcwd())
+trainPath = os.getcwd() + '/data/train'
+validPath = os.getcwd() + '/data/validation'
+testPath = os.getcwd() + '/data/test'
+
+trainBatch = ImageDataGenerator(preprocessing_function=vgg16.preprocess_input) \
+             .flow_from_directory(directory=trainPath,
+                                  target_size=(100, 100),
+                                  classes=['artifact', 'noRecruit', 'recruit'],
+                                  batch_size=10)
+validBatch = ImageDataGenerator(preprocessing_function=vgg16.preprocess_input) \
+             .flow_from_directory(directory=validPath,
+                                  target_size=(100, 100),
+                                  classes=['artifact', 'noRecruit', 'recruit'],
+                                  batch_size=10)
+testBatch = ImageDataGenerator(preprocessing_function=vgg16.preprocess_input) \
+            .flow_from_directory(directory=testPath,
+                                 target_size=(100, 100),
+                                 classes=['artifact', 'noRecruit', 'recruit'],
+                                 batch_size=10)
+print(trainBatch)
 
 model = Sequential()
 firstConvLayer = Conv2D(filters=96,
@@ -61,3 +85,9 @@ model.add(Dense(units=4096, activation='relu'))
 model.add(Dense(units=4096, activation='softmax'))
 
 model.summary()
+
+model.compile(optimizer=Adam(learning_rate=0.0001),
+             loss='categorical_crossentropy',
+             metrics=['accuracy'])
+
+# model.fit(x=trainBatch, validation_data=validBatch, epochs=100, verbose=2)
