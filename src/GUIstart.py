@@ -144,28 +144,9 @@ def main():
                 pickle.dump(info, f)
 
 
-            # Change: Maybe do not need a csv --> User can already visualise
             # Next, create the csv for the data.
-            # Get a copy of the info dictionary, an
-            # with open(savePath + '.csv', 'w') as f:
-            #     writer = csv.writer(f)
-            #     writer.writerow(['Pathogen information'])
-            #     # Add the headers for the pathogen information.
-            #     pathogenHeaders = []
-            #     for key in info['pathogenInfo'].keys():
-            #         if (valid_csv_header(key)):
-            #             pathogenHeaders.append(key)
-            #     # Then, write these headers to the csv
-            #     writer.writerow(pathogenHeaders)
-            #     rows = []
-            #     for i in range(0, len(info['pathogenInfo']['area'])):
-            #         row = []
-            #         for key in info['pathogenInfo'].keys():
-            #             if (valid_csv_header(key)):
-            #                 row.append(info['pathogenInfo'][key][i])
-            #         rows.append(row)
-            #     for row in rows:
-            #         writer.writerow(row)
+            with open(savePath + '.csv', 'w') as f:
+                write_csv(f, info)
             break
     
     window.close()
@@ -209,10 +190,54 @@ def change_measurements_entity(info, micronpp, entityInfo):
 #   - key: The key to be examined.
 def is_measurement(key):
     return True if (key == 'area' or key == 'perimeter') else False
-        
 
-# def valid_csv_header(key):
-#     return False if (key == 'bounding_box' or key == 'image') else True
+# Below checks if the key is valid for the csv. 
+# The valid keys exclude bounding_box and image.
+# Arguments:
+#   - key: The key to be examined
+def valid_csv_header(key):
+    return False if (key == 'bounding_box' or key == 'image') else True
+
+# The function below is called by the main function. It will simply call
+# write_csv_entity on pathogenInfo and cellInfo separately. The rationale
+# for this function was to decouple it from the main function, so that the main function
+# does not need to know that it needs to call write_csv on 'pathogenInfo'
+# or 'cellInfo'. Any extra entities that I want to print can simply be added to
+# write_csv instead of the main function.
+# Arguments:
+#   - info: Dictionary containing all information generated from image_analysis in image.py
+#   - f: The csv file open for writing.
+def write_csv(f, info):
+    write_csv_entity(f, info, 'pathogenInfo', 'Pathogen Information')
+    write_csv_entity(f, info, 'cellInfo', 'Cell Information')
+
+# Below is to write to a csv file with a subheading, and the entity to target.
+# Arguments:
+#   - f: The csv file open for writing
+#   - info: Dictionary containing all information generated from image_analysis in image.py
+#   - entityInfo: The entity to target for writing (e.g. pathogenInfo or cellInfo)
+#   - subheading: The subheading for the entity to target. This will be placed onto a
+#                 separate row.
+def write_csv_entity(f, info, entityInfo, subheading):
+    writer = csv.writer(f)
+    #Create the pathogen information.
+    writer.writerow([subheading])
+    # Add the headers for the pathogen information.
+    pathogenHeaders = []
+    for key in info[entityInfo].keys():
+        if (valid_csv_header(key)):
+            pathogenHeaders.append(key)
+    # Then, write these headers to the csv
+    writer.writerow(pathogenHeaders)
+    rows = []
+    for i in range(0, len(info[entityInfo]['area'])):
+        row = []
+        for key in info['pathogenInfo'].keys():
+            if (valid_csv_header(key)):
+                row.append(info[entityInfo][key][i])
+        rows.append(row)
+    for row in rows:
+        writer.writerow(row)
 
 if __name__ == '__main__':
     main()
