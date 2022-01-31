@@ -91,8 +91,6 @@ def visualize(info):
     #         print('HARR')
     #         selectSpecificCol.update(buttonList)
     #         window.close()
-            
-    
     
     pathogenColumn = [
         [
@@ -198,10 +196,14 @@ def visualize(info):
 #         print('Continuing')
 
 def form_pathogen_info(info, index):
-    return ('Pathogen number: ' + str(index) + '\nArea: ' + str(info['area'][index]))
+    return ('Pathogen number: ' + str(index) + '\nArea: ' + \
+            str(round(info['area'][index], 2)) +  u'\u03bcm\u00b2' \
+            + '\nPerimeter: ' + str(round(info['perimeter'][index], 2)) + u'\u03bcm')
     
 def form_cell_info(info, index):
-    return ('Cell number: ' + str(index) + '\nArea: ' + str(info['area'][index]) + \
+    return ('Cell number: ' + str(index) + '\nArea: ' + \
+            str(round(info['area'][index], 2)) + u'\u03bcm\u00b2' + '\nPerimeter: ' + \
+            str(round(info['perimeter'][index], 2)) + u'\u03bcm' + \
             '\nNumber of pathogen/vacuole(s): ' + str(info['pathogen_number'][index]))
 
 def form_whole_image_from_array(imageArray):

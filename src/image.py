@@ -16,7 +16,8 @@ plt.style.use('fivethirtyeight')
 #   - pathogenPath: Path to the pathogen images
 #   - cellPath: Path to the cell images
 # Returns:
-#   ==========TODO===========
+#   - A dictionary containing the images, as well as information about the pathogens
+#     that are intersecting with the cells. There is also cell information as well.
 def image_analysis(nucleiPath, pathogenPath, cellPath):
     
     # Scan through the nuclei, and correct...
@@ -27,7 +28,7 @@ def image_analysis(nucleiPath, pathogenPath, cellPath):
     intersection_info = get_intersection_information(pathogenImages, cellImages)
     # Generate information about whether the cells are infected, and the number of
     # pathogens in the cell. In addition, generate information on the pathogens.
-    cProfile.runctx('get_intersection_information(pathogenImages, cellImages)', {'get_intersection_information': get_intersection_information}, {'pathogenImages': pathogenImages, 'cellImages': cellImages}, filename='report.txt' )
+    # cProfile.runctx('get_intersection_information(pathogenImages, cellImages)', {'get_intersection_information': get_intersection_information}, {'pathogenImages': pathogenImages, 'cellImages': cellImages}, filename='report.txt' )
     
     # Return the labelled images of the nuclei, pathogen and cells. In addition, return
     # information about the intersection between the pathogens and cells.
@@ -48,7 +49,12 @@ def image_analysis(nucleiPath, pathogenPath, cellPath):
 def label_nuclei_images(path):
     return label_images_otsu(path, None)
 
-# TODO
+# This function is to help segment the pathogen images. It takes in a path to the
+# pathogen images.
+# Arguments:
+#   - path (string): The path to the directory with the pathogen images.
+# returns:
+#   - label_images_otsu(path): A list of the labelled images.
 def label_pathogen_images(path):
     return label_images_otsu(path, None)
 
@@ -132,11 +138,19 @@ def label_images_otsu(path, nucleiImages):
         # Place unique labels on segmented areas
         labelImg = measure.label(labelImg, connectivity=greyImage.ndim) 
 
-        plt.imshow(labelImg)
-        plt.show()
+        # plt.imshow(labelImg)
+        # plt.show()
         images.append((labelImg, image))
     return images
-    
+
+# The function below simply combines the labelling of the nuclei and the cells.
+# This is to fill in the 'hole' in cell images, where the nuclei is not visible.
+# Arguments:
+#   - cellLabel: The labelled image of the cell
+#   - nucleiLabel: The labelled image of the nuclei
+# Returns:
+#   - A numpy array with values 0 representing the background, and 1 representing the
+#     foreground.
 def combine_cell_nuclei_label(cellLabel, nucleiLabel):
     relabelNuclei = (nucleiLabel > 0).astype(int)
     cellLabel = (cellLabel > 0).astype(int)
@@ -157,26 +171,6 @@ def combine_cell_nuclei_label(cellLabel, nucleiLabel):
 def apply_clahe(img):
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     return clahe.apply(img)
-
-# The function below takes in a path, and scans through the images to
-# then return a list of the labelled images.
-# arguments:
-#   - path (string): The path to the directory that will have the cell images that are
-#                    to be segmented.
-# returns:
-#   - images (list): The list of labelled cell images
-# def label_images_huang(path):
-#     images = []
-#     # Obtain the file names in the directory dictated by path
-#     pathNames = obtain_file_names(path)
-#     for imagePath in pathNames:
-#         image = cv2.imread(imagePath)
-#         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-#         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-#         cl1 = clahe.apply(image)
-#         ret, alteredImg = cv2.threshold(cl1, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-#         plt.imshow(alteredImg)
-#         plt.show()
 
 # The function below takes in tuples of pathogen images and cell images (These tuples are generated
 # by label_images_otsu). Overall, it filters out extracellular pathogens, and calculates
@@ -234,11 +228,9 @@ def get_intersection_information(pathogenImages, cellImages):
         joinedLabels = segmentation.join_segmentations(intracellularPathogens[i], labelledCell[i])
         cellPathogenLabel = measure.label(joinedLabels)
         cellPathogenLabels.append(cellPathogenLabel)
-        # plt.imshow(cellPathogenLabels[i])
-        # plt.show()
 
-    pathogenInfo = {'bounding_box': [], 'area': [], 'image': []}
-    cellInfo = {'bounding_box': [], 'area': [], 'image': [], 'pathogen_number': []}
+    pathogenInfo = {'bounding_box': [], 'area': [], 'image': [], 'perimeter': []}
+    cellInfo = {'bounding_box': [], 'area': [], 'image': [], 'pathogen_number': [], 'perimeter': []}
 
     # Analyse the properties of each label using regionprops
     for i in range(0, len(cellPathogenLabels)):
@@ -322,6 +314,7 @@ def file_exception_checking(path):
 def extract_pathogen_info(pathogenInfo, ogImage, regionInfo):
     pathogenInfo['bounding_box'].append(regionInfo.bbox)
     pathogenInfo['area'].append(regionInfo.area)
+    pathogenInfo['perimeter'].append(regionInfo.perimeter)
     pathogenInfo['image'].append(ogImage)
 
 # Extracts information about a specific cell.
@@ -334,6 +327,7 @@ def extract_cell_info(cellInfo, ogImage, regionInfo, pathogenNum):
     cellInfo['bounding_box'].append(regionInfo.bbox)
     cellInfo['area'].append(regionInfo.area)
     cellInfo['image'].append(ogImage)
+    cellInfo['perimeter'].append(regionInfo.perimeter)
     cellInfo['pathogen_number'].append(pathogenNum)
 
 if __name__ == '__main__':
