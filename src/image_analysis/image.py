@@ -471,4 +471,4 @@ def extract_cell_info(cellInfo, ogImage, regionInfo, pathogenNum):
     cellInfo['pathogen_number'].append(pathogenNum)
 
 if __name__ == '__main__':
-    image_analysis("Images/Nuclei", "Images/Pathogen", "Images/Cell", 10000)
+    image_analysis("../Images/Nuclei", "../Images/Pathogen", "../Images/Cell", 10000)
