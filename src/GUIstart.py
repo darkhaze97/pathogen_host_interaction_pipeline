@@ -69,8 +69,8 @@ def main():
     # Obtain the magnification from the user.
     magnification = 0
     micronpp = 0
-    
-    magnifList = [
+    customThreshold = None
+    paramList = [
         [
             sg.Text('Magnification of the image:'),
             sg.In(size=(25, 1), enable_events=True, key='#magnification')
@@ -80,13 +80,17 @@ def main():
             sg.In(size=(25, 1), enable_events=True, key='#micronpp', default_text='6.5')
         ],
         [
+            sg.Text('Optional custom threshold value:'),
+            sg.In(size=(25, 1), enable_events=True, key='#customthreshold')
+        ],
+        [
             sg.Button('Confirm')
         ]
     ]
     
     layout = [
         [
-            sg.Column(magnifList)
+            sg.Column(paramList)
         ]
     ]
     
@@ -99,11 +103,13 @@ def main():
             magnification = float(values['#magnification']) if not values['#magnification'] == '0' \
                             else 1.0
             micronpp = float(values['#micronpp'])
+            if (not values['#customthreshold'] == '' and values['#customthreshold'].isnumeric()):
+                customThreshold = int(values['#customthreshold'])
             break
     
     window.close()
         
-    info = image_analysis(nucleiPath, pathogenPath, cellPath)
+    info = image_analysis(nucleiPath, pathogenPath, cellPath, customThreshold)
     micronpp = micronpp/magnification
     # Change the area and perimeter values using the micron per pixel for the given magnification
     change_measurements(info, micronpp)
@@ -181,9 +187,12 @@ def change_measurements_entity(info, micronpp, entityInfo):
         print('This entity is not in the info dictionary. Please contact creator.')
         return
     for key in info[entityInfo]:
-        if (is_measurement(key)):
+        if (key == 'perimeter'):
             for i in range(0, len(info[entityInfo][key])):
                 info[entityInfo][key][i] = info[entityInfo][key][i] * micronpp
+        elif (key == 'area'):
+            for i in range(0, len(info[entityInfo][key])):
+                info[entityInfo][key][i] = info[entityInfo][key][i] * micronpp * micronpp
 
 # Below simply checks if the key is of a measurement.
 # Arguments:
@@ -232,7 +241,7 @@ def write_csv_entity(f, info, entityInfo, subheading):
     rows = []
     for i in range(0, len(info[entityInfo]['area'])):
         row = []
-        for key in info['pathogenInfo'].keys():
+        for key in info[entityInfo].keys():
             if (valid_csv_header(key)):
                 row.append(info[entityInfo][key][i])
         rows.append(row)
