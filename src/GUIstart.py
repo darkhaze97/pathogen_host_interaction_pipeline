@@ -3,9 +3,11 @@ import cv2
 import pickle
 import csv
 
-from visualize import visualize
+from frontend import visualize
 
-from image import image_analysis
+# from image import image_analysis
+
+from image_analysis import image_analysis
 # class SelectPath(ed.Component):
 #     def __init__(self):
 #         super().__init__()
