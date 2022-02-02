@@ -1,3 +1,5 @@
+import math
+
 import PySimpleGUI as sg
 import cv2
 import pickle
@@ -166,7 +168,8 @@ def main():
 # for this function was to decouple it from the main function, so that the main function
 # does not need to know that it needs to call change_measurements on 'pathogenInfo'
 # or 'cellInfo'. Any extra entities that I want to print can simply be added to
-# change_measurements instead of the main function.
+# change_measurements instead of the main function. Whenever a new column/stat is to be added,
+# simply call addColumn.
 # Arguments:
 #   - info: Dictionary containing all information generated from image_analysis in image.py
 #   - micronpp: Microns per pixel.
@@ -176,6 +179,12 @@ def change_measurements(info, micronpp):
     # and do not need to change anything in this function.
     change_measurements_entity(info, micronpp, 'pathogenInfo')
     change_measurements_entity(info, micronpp, 'cellInfo')
+    # Add any new columns that should be examined. Read the documentation for 
+    # addColumn for further details.
+    addColumn('circularity', info, 'pathogenInfo',
+              lambda dict, i: (4 * math.pi * dict['area'][i]/(dict['perimeter'][i] ** 2)))
+    addColumn('circularity', info, 'cellInfo',
+              lambda dict, i: (4 * math.pi * dict['area'][i]/(dict['perimeter'][i] ** 2)))
 
 # The function below changes the measurements in an entity's information.
 # It does this by changing the pixels in measurements (like area or perimeter) into
@@ -195,6 +204,25 @@ def change_measurements_entity(info, micronpp, entityInfo):
         elif (key == 'area'):
             for i in range(0, len(info[entityInfo][key])):
                 info[entityInfo][key][i] = info[entityInfo][key][i] * micronpp * micronpp
+
+# The function below is to simply add an extra value to look at, apart from area and
+# perimeter.
+# Arguments:
+#   - colName: The new column name
+#   - info: The dictionary containing all information generated from image_analysis in image.py
+#   - entityInfo: The entity in which the new column will be added
+#   - fnc: A function that will be applied to each entity. The index and info[entityInfo]
+#          will be passed in, where the index is used to obtain the current entity that is
+#          being examined. This function must have a return value.
+def addColumn(colName, info, entityInfo, fnc):
+    # For every entity in info[entityInfo], apply fnc
+    # randKey simply obtains a random key that is already present in info[entityInfo],
+    # so that we do not need to hard code a column name in, like area or perimeter
+    randKey = list(info[entityInfo].keys())[0]
+    entityNum = len(info[entityInfo][randKey])
+    info[entityInfo][colName] = []
+    for i in range(0, entityNum):
+        info[entityInfo][colName].append(fnc(info[entityInfo], i))
 
 # Below simply checks if the key is of a measurement.
 # Arguments:
@@ -250,5 +278,9 @@ def write_csv_entity(f, info, entityInfo, subheading):
     for row in rows:
         writer.writerow(row)
 
+# =============== ADD ANY NEW COLUMN METHODS HERE ================
+# These methods must return a value.
+
+# ================================================================
 if __name__ == '__main__':
     main()

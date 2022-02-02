@@ -3,12 +3,8 @@ from random import gauss
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-from skimage import measure, segmentation, morphology, img_as_float
+from skimage import measure, segmentation, morphology
 from skimage.segmentation import clear_border
-from skimage.filters import gaussian
-from skimage.feature import peak_local_max
-from skimage.morphology import reconstruction
-from scipy.ndimage import gaussian_filter
 import pandas as pd
 import cProfile
 plt.style.use('fivethirtyeight')
@@ -130,41 +126,6 @@ def label_images_otsu(path, nucleiImages, threshold):
         # If nucleiImages are provided, combine the labelImg with the nucleiLabel.
         # Note that nucleiImage[0] corresponds to the nucleiLabel that was accessed first.
         if (not nucleiImages == None):
-            # plt.imshow(alteredImg)
-            # plt.show()
-            # img  = img_as_float(alteredImg)
-            # img = gaussian_filter(alteredImg, 1)
-            # seed = np.copy(img)
-            # seed[1:-1, 1:-1] = img.min()
-            
-            # mask = img
-            # dilated = reconstruction(seed, mask, method='dilation')
-            
-            # # Apply watershedding to the cell images.
-            # # plt.imshow(img - dilated)
-            # # plt.show()
-            # kernel = np.ones((3,3), np.uint8)
-            
-            # sure_bg = cv2.dilate(alteredImg, kernel, iterations=10)
-            
-            # distTransform = cv2.distanceTransform(alteredImg, cv2.DIST_L2, 5)
-            
-            # ret2, sure_fg = cv2.threshold(distTransform, 0.28*distTransform.max(), 255, 0)
-            
-            # sure_fg = np.uint8(sure_fg)
-            # unknown = cv2.subtract(sure_bg, sure_fg)
-            
-            # ret3, markers = cv2.connectedComponents(sure_fg)
-            
-            # markers = markers + 1
-            # # 1 is now the background
-            
-            # markers[unknown==255] = 0
-            
-            # alteredImg = cv2.watershed(image, markers)
-            
-            # alteredImg = (alteredImg > 1).astype(int)
-            
             alteredImg = combine_cell_nuclei_label(alteredImg, nucleiImages[i][0])
             i = i + 1
 

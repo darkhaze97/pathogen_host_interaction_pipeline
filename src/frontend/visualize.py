@@ -8,6 +8,25 @@ import tkinter as tk
 # from PIL import Image, ImageTk
 import matplotlib.pyplot as plt
 
+# The variable below is to help print out statistics associated with each entity.
+# Each stat, e.g. area, will be connected to a lambda function, which will print out
+# the stat. The lambda function takes in an entity dictionary that contains all the
+# information about the entity, and also an index
+# that will be used to print out information related to the entity specified by the
+# index. This will be used for both pathogenInfo and cellInfo.
+# Whenever a new stat/column is added, you only need to add to this statPrinter. This makes it
+# convenient.
+statPrinter = {
+    'area': lambda info, i: '\nArea: ' + str(round(info['area'][i], 2)) +  u'\u03bcm\u00b2',
+    'perimeter': lambda info, i: '\nPerimeter: ' + str(round(info['perimeter'][i], 2)) + u'\u03bcm',
+    'circularity': lambda info, i: '\nCircularity: ' + str(round(info['circularity'][i], 3)),
+    'pathogen_number': lambda info, i: '\nNumber of pathogen/vacuole(s): ' + str(info['pathogen_number'][i]),
+    # Place the unused stats below, and follow the same structure as used for bounding_box
+    # and image
+    'bounding_box': lambda info, i: '',
+    'image': lambda info, i: ''
+}
+
 def visualize(info):
     # root = tk.Tk()
     # canv = tk.Canvas(root, width=1048, height=1048, bg='white')
@@ -196,15 +215,16 @@ def visualize(info):
 #         print('Continuing')
 
 def form_pathogen_info(info, index):
-    return ('Pathogen number: ' + str(index) + '\nArea: ' + \
-            str(round(info['area'][index], 2)) +  u'\u03bcm\u00b2' \
-            + '\nPerimeter: ' + str(round(info['perimeter'][index], 2)) + u'\u03bcm')
+    retStr = 'Pathogen number: ' + str(index)
+    for key in info.keys():
+        retStr = retStr + statPrinter[key](info, index)
+    return retStr
     
 def form_cell_info(info, index):
-    return ('Cell number: ' + str(index) + '\nArea: ' + \
-            str(round(info['area'][index], 2)) + u'\u03bcm\u00b2' + '\nPerimeter: ' + \
-            str(round(info['perimeter'][index], 2)) + u'\u03bcm' + \
-            '\nNumber of pathogen/vacuole(s): ' + str(info['pathogen_number'][index]))
+    retStr = 'Cell number: ' + str(index)
+    for key in info.keys():
+        retStr = retStr + statPrinter[key](info, index)
+    return retStr
 
 def form_whole_image_from_array(imageArray):
     imageArray = imageArray[10:100, 20:200]
