@@ -100,7 +100,7 @@ def visualize(info):
     
     for i in range(0, len(info['pathogenInfo']['area'])):
         pathogenColumn.append([Text(form_pathogen_info(info['pathogenInfo'],i)),
-                               Image(reform_cropped_image_from_array(info['pathogenInfo']['image'][i],
+                               Image(reform_cropped_image_from_array(info['pathogenImages'][info['pathogenInfo']['image'][i]][1],
                                                                      info['pathogenInfo']['bounding_box'][i]),
                                      size = (200, 200)
                                )])
@@ -127,7 +127,7 @@ def visualize(info):
     
     for i in range(0, len(info['cellInfo']['area'])):
         cellColumn.append([Text(form_cell_info(info['cellInfo'], i)),
-                           Image(reform_cropped_image_from_array(info['cellInfo']['image'][i],
+                           Image(reform_cropped_image_from_array(info['cellImages'][info['cellInfo']['image'][i]][1],
                                                                  info['cellInfo']['bounding_box'][i]),
                            size = (200, 200))
         ])

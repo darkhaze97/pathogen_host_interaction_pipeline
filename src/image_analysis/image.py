@@ -1,9 +1,14 @@
 import os
+from random import gauss
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-from skimage import measure, segmentation, morphology, future
+from skimage import measure, segmentation, morphology, img_as_float
 from skimage.segmentation import clear_border
+from skimage.filters import gaussian
+from skimage.feature import peak_local_max
+from skimage.morphology import reconstruction
+from scipy.ndimage import gaussian_filter
 import pandas as pd
 import cProfile
 plt.style.use('fivethirtyeight')
@@ -30,6 +35,20 @@ def image_analysis(nucleiPath, pathogenPath, cellPath, threshold):
     # Generate information about whether the cells are infected, and the number of
     # pathogens in the cell. In addition, generate information on the pathogens.
     # cProfile.runctx('get_intersection_information(pathogenImages, cellImages)', {'get_intersection_information': get_intersection_information}, {'pathogenImages': pathogenImages, 'cellImages': cellImages}, filename='report.txt' )
+    
+    # Now, obtain the intracellular images, and 0 pad them, to prepare them to run through
+    # the CNN.
+    pathogenCNN = []
+    for i in range(0, len(intersection_info['pathogenInfo']['image'])):
+        imageNum = intersection_info['pathogenInfo']['image'][i]
+        bb = intersection_info['pathogenInfo']['bounding_box'][i]
+        cropImg = (pathogenImages[imageNum][1])[bb[0]:bb[2], bb[1]:bb[3]]
+        ogShape = np.shape(cropImg)
+        padImg = np.zeros((100, 100))
+        padImg[:ogShape[0], :ogShape[1]] = cropImg
+        pathogenCNN.append(padImg)
+    
+    # Run the CNN here...
     
     # Return the labelled images of the nuclei, pathogen and cells. In addition, return
     # information about the intersection between the pathogens and cells.
@@ -105,28 +124,53 @@ def label_images_otsu(path, nucleiImages, threshold):
                           if (threshold == None) else \
                           cv2.threshold(src=greyImage, thresh=threshold, maxval=255, type=cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         
+        # Remove elements on the border. 
+        alteredImg = clear_border(alteredImg)
+        
         # If nucleiImages are provided, combine the labelImg with the nucleiLabel.
         # Note that nucleiImage[0] corresponds to the nucleiLabel that was accessed first.
         if (not nucleiImages == None):
-            # # Relabel the background to be (0), and all other labels be (1) in nucleiImags[i][0]
-            # relabelNuclei = (nucleiImages[i][0] > 0).astype(int)
-            # labelCellInitial = (alteredImg > 0).astype(int)
-            # # relabelCell = (labelImg == True).astype(int)
-            # # Join the labels of the cells and nuclei.
-            # joinedLabels = segmentation.join_segmentations(relabelNuclei, labelCellInitial)
+            # plt.imshow(alteredImg)
+            # plt.show()
+            # img  = img_as_float(alteredImg)
+            # img = gaussian_filter(alteredImg, 1)
+            # seed = np.copy(img)
+            # seed[1:-1, 1:-1] = img.min()
             
-            # # Make the background (0) and other labels be (1) again.
-            # alteredImg = (joinedLabels > 0).astype(int)
+            # mask = img
+            # dilated = reconstruction(seed, mask, method='dilation')
+            
+            # # Apply watershedding to the cell images.
+            # # plt.imshow(img - dilated)
+            # # plt.show()
+            # kernel = np.ones((3,3), np.uint8)
+            
+            # sure_bg = cv2.dilate(alteredImg, kernel, iterations=10)
+            
+            # distTransform = cv2.distanceTransform(alteredImg, cv2.DIST_L2, 5)
+            
+            # ret2, sure_fg = cv2.threshold(distTransform, 0.28*distTransform.max(), 255, 0)
+            
+            # sure_fg = np.uint8(sure_fg)
+            # unknown = cv2.subtract(sure_bg, sure_fg)
+            
+            # ret3, markers = cv2.connectedComponents(sure_fg)
+            
+            # markers = markers + 1
+            # # 1 is now the background
+            
+            # markers[unknown==255] = 0
+            
+            # alteredImg = cv2.watershed(image, markers)
+            
+            # alteredImg = (alteredImg > 1).astype(int)
+            
             alteredImg = combine_cell_nuclei_label(alteredImg, nucleiImages[i][0])
             i = i + 1
-        
+
         # Convert the alteredImg into a boolean array. Then we are able to remove 
         # small objects.
         labelImg = alteredImg > 0
-        
-        # Remove labels that are at the edges, since they have segments outside of the field of view
-        # that we cannot analyse.
-        labelImg = clear_border(labelImg)
         
         # Remove small objects in the altered image. The minimal size will be based on if the
         # image was a pathogen, cell or nucleus. A larger minimal value is needed for
@@ -134,9 +178,9 @@ def label_images_otsu(path, nucleiImages, threshold):
         # or pathogens.
         labelImg = morphology.remove_small_objects(labelImg, 2000) if (not nucleiImages == None) \
                         else morphology.remove_small_objects(labelImg, 100)
-        
+
         # Then, remove holes that are within labels.
-        labelImg = morphology.remove_small_holes(labelImg, 10000)
+        labelImg = morphology.remove_small_holes(labelImg, 1000)
         
         # Place unique labels on segmented areas
         labelImg = measure.label(labelImg, connectivity=greyImage.ndim) 
@@ -302,11 +346,11 @@ def get_intersection_information(pathogenImages, cellImages):
                 if (isCell):
                     # If this is a cell, then record the number of pathogens within it as
                     # well
-                    extract_cell_info(cellInfo, cellImages[i][1], label, len(neighbours))
+                    extract_cell_info(cellInfo, i, label, len(neighbours))
                 else:
-                    extract_pathogen_info(pathogenInfo, pathogenImages[i][1], label)
+                    extract_pathogen_info(pathogenInfo, i, label)
             elif (len(neighbours) == 0):
-                extract_cell_info(cellInfo, cellImages[i][1], label, 0)
+                extract_cell_info(cellInfo, i, label, 0)
     return {'pathogenInfo': pathogenInfo, 'cellInfo': cellInfo}
 
 
@@ -451,11 +495,11 @@ def file_exception_checking(path):
 #                   'global' data)
 #   - ogImage: Original image that the pathogen comes from
 #   - regionInfo: Information about the pathogen that will be added to pathogenInfo
-def extract_pathogen_info(pathogenInfo, ogImage, regionInfo):
+def extract_pathogen_info(pathogenInfo, imageNum, regionInfo):
     pathogenInfo['bounding_box'].append(regionInfo.bbox)
     pathogenInfo['area'].append(regionInfo.area)
     pathogenInfo['perimeter'].append(regionInfo.perimeter)
-    pathogenInfo['image'].append(ogImage)
+    pathogenInfo['image'].append(imageNum)
 
 # Extracts information about a specific cell.
 # Arguments:
@@ -463,10 +507,10 @@ def extract_pathogen_info(pathogenInfo, ogImage, regionInfo):
 #   - ogImage: Original image that the cell comes from
 #   - regionInfo: Information about the cell that will be added to cellInfo
 #   - pathogenNum: The number of pathogens in the cell
-def extract_cell_info(cellInfo, ogImage, regionInfo, pathogenNum):
+def extract_cell_info(cellInfo, imageNum, regionInfo, pathogenNum):
     cellInfo['bounding_box'].append(regionInfo.bbox)
     cellInfo['area'].append(regionInfo.area)
-    cellInfo['image'].append(ogImage)
+    cellInfo['image'].append(imageNum)
     cellInfo['perimeter'].append(regionInfo.perimeter)
     cellInfo['pathogen_number'].append(pathogenNum)
 

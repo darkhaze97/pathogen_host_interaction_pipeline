@@ -5,3 +5,4 @@ scikit-image
 pandas
 pysimplegui
 pickle
+scipy
