@@ -6,3 +6,4 @@ pandas
 pysimplegui
 pickle
 pyimagej
+scikit-learn

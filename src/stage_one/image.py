@@ -8,7 +8,7 @@ import pandas as pd
 import cProfile
 plt.style.use('fivethirtyeight')
 
-from intersect import get_intersection_information
+from .intersect import get_intersection_information
 
 # The function below is to coordinate the analysis of the images. It first labels the
 # images, then finds the intersection of the pathogens with the cell labels. 
@@ -20,14 +20,14 @@ from intersect import get_intersection_information
 # Returns:
 #   - A dictionary containing the images, as well as information about the pathogens
 #     that are intersecting with the cells. There is also cell information as well.
-def image_analysis(nucleiPath, pathogenPath, cellPath, threshold):
+def image_analysis(nucleiPath, pathogenPath, cellPath, threshold, savePath):
     
     # Scan through the nuclei, and correct...
     nucleiImages = label_nuclei_images(nucleiPath, threshold)
     pathogenImages = label_pathogen_images(pathogenPath, threshold)
     cellImages = label_cell_images(cellPath, nucleiImages, threshold)
     
-    intersection_info = get_intersection_information(pathogenImages, cellImages)
+    intersection_info = get_intersection_information(pathogenImages, cellImages, savePath)
     # Generate information about whether the cells are infected, and the number of
     # pathogens in the cell. In addition, generate information on the pathogens.
     # cProfile.runctx('get_intersection_information(pathogenImages, cellImages)', {'get_intersection_information': get_intersection_information}, {'pathogenImages': pathogenImages, 'cellImages': cellImages}, filename='report.txt' )
@@ -214,4 +214,4 @@ def file_exception_checking(path):
         print('The directory path does not exist.')
 
 if __name__ == '__main__':
-    image_analysis("../Images/Nuclei", "../Images/Pathogen", "../Images/Cell", 10000)
+    image_analysis("../Images/Nuclei", "../Images/Pathogen", "../Images/Cell", 10000, './temp')

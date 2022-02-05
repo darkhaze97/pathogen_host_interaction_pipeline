@@ -9,7 +9,7 @@ from frontend import visualize
 
 # from image import image_analysis
 
-from image_analysis import image_analysis
+from stage_one import image_analysis
 # class SelectPath(ed.Component):
 #     def __init__(self):
 #         super().__init__()
@@ -112,11 +112,6 @@ def main():
             break
     
     window.close()
-        
-    info = image_analysis(nucleiPath, pathogenPath, cellPath, customThreshold)
-    micronpp = micronpp/magnification
-    # Change the area and perimeter values using the micron per pixel for the given magnification
-    change_measurements(info, micronpp)
     
     savePath = ''
     
@@ -148,18 +143,24 @@ def main():
             break
         elif (event == 'Confirm'):
             savePath = values['#savepath'] + '/' + values['#filename']
-            # First, create the pickle file. This is to use with visualize.py, so that
-            # the user can see the images again in the GUI.
-            with open(savePath + '.pickle', 'wb') as f:
-                pickle.dump(info, f)
-
-
-            # Next, create the csv for the data.
-            with open(savePath + '.csv', 'w') as f:
-                write_csv(f, info)
             break
     
     window.close()
+        
+    info = image_analysis(nucleiPath, pathogenPath, cellPath, customThreshold, savePath)
+    micronpp = micronpp/magnification
+    # Change the area and perimeter values using the micron per pixel for the given magnification
+    change_measurements(info, micronpp)
+    
+    savePath = values['#savepath'] + '/' + values['#filename']
+    # First, create the pickle file. This is to use with visualize.py, so that
+    # the user can see the images again in the GUI.
+    with open(savePath + '.pickle', 'wb') as f:
+        pickle.dump(info, f)
+
+    # Next, create the csv for the data.
+    with open(savePath + '.csv', 'w') as f:
+        write_csv(f, info)
             
     visualize(info)
 
@@ -181,10 +182,10 @@ def change_measurements(info, micronpp):
     change_measurements_entity(info, micronpp, 'cellInfo')
     # Add any new columns that should be examined. Read the documentation for 
     # addColumn for further details.
-    addColumn('circularity', info, 'pathogenInfo',
-              lambda dict, i: (4 * math.pi * dict['area'][i]/(dict['perimeter'][i] ** 2)))
-    addColumn('circularity', info, 'cellInfo',
-              lambda dict, i: (4 * math.pi * dict['area'][i]/(dict['perimeter'][i] ** 2)))
+    # addColumn('circularity', info, 'pathogenInfo',
+    #           lambda dict, i: (4 * math.pi * dict['area'][i]/(dict['perimeter'][i] ** 2)))
+    # addColumn('circularity', info, 'cellInfo',
+    #           lambda dict, i: (4 * math.pi * dict['area'][i]/(dict['perimeter'][i] ** 2)))
 
 # The function below changes the measurements in an entity's information.
 # It does this by changing the pixels in measurements (like area or perimeter) into
@@ -198,7 +199,7 @@ def change_measurements_entity(info, micronpp, entityInfo):
         print('This entity is not in the info dictionary. Please contact creator.')
         return
     for key in info[entityInfo]:
-        if (key == 'perimeter'):
+        if (key == 'perimeter' or key == 'diameter'):
             for i in range(0, len(info[entityInfo][key])):
                 info[entityInfo][key][i] = info[entityInfo][key][i] * micronpp
         elif (key == 'area'):

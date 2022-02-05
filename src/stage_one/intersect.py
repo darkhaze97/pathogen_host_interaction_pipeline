@@ -1,3 +1,4 @@
+import math
 import os
 import matplotlib.pyplot as plt
 from skimage import measure, segmentation
@@ -16,7 +17,7 @@ ij = imagej.init()
 #   - A dictionary which has the keys 'pathogenInfo' and 'cellInfo'. These map to
 #     values about pathogens and cells. Note that cellInfo['area'][2] and
 #     cellInfo['pathogen_number'][2] are referring to the same cell.
-def get_intersection_information(pathogenImages, cellImages):
+def get_intersection_information(pathogenImages, cellImages, savePath):
     # Relabel all labels to 0 (background) or 1 in both the cell and pathogen images.
     labelledPathogen = []
     labelledCell = []
@@ -66,8 +67,10 @@ def get_intersection_information(pathogenImages, cellImages):
         cellPathogenLabel = measure.label(joinedLabels)
         cellPathogenLabels.append(cellPathogenLabel)
 
-    pathogenInfo = {'bounding_box': [], 'area': [], 'image': [], 'perimeter': []}
-    cellInfo = {'bounding_box': [], 'area': [], 'image': [], 'pathogen_number': [], 'perimeter': []}
+    pathogenInfo = {'bounding_box': [], 'area': [], 'image': [], 'perimeter': [],
+                    'diameter': [], 'circularity': []}
+    cellInfo = {'bounding_box': [], 'area': [], 'image': [], 'pathogen_number': [], 'perimeter': [],
+                'diameter': [], 'circularity': []}
 
     # Analyse the properties of each label in each image using regionprops
     for i in range(0, len(cellPathogenLabels)):
@@ -137,12 +140,13 @@ def get_intersection_information(pathogenImages, cellImages):
                 else:
                     # Obtain fluorescence data first. This will be used for the
                     # decision tree later.
-                    measure_fluorescence(pathogenInfo, pathogenImages[i], bound)
+                    measure_fluorescence(pathogenInfo, pathogenImages[i], bound, savePath)
                     extract_pathogen_info(pathogenInfo, i, label)
             elif (len(neighbours) == 0):
                 extract_cell_info(cellInfo, i, label, 0)
-    if (os.path.exists('./temp.csv')):
-        os.remove('./temp.csv')
+    if (os.path.exists(savePath + '.csv')):
+        os.remove(savePath + '.csv')
+    print(pathogenInfo)
     return {'pathogenInfo': pathogenInfo, 'cellInfo': cellInfo}
 
 
@@ -254,7 +258,7 @@ def exists(arr, val, first, last):
     return (exists(arr, val, first, mid) or exists(arr, val, mid + 1, last))
 
 # ===============TODO======================
-def measure_fluorescence(pathogenInfo, image, bound):
+def measure_fluorescence(pathogenInfo, image, bound, savePath):
     # Measure the fluorescence readings, and prepare to add to the dictionary
     # that stores information about the entity.
     # We form rectangles around the original image, and then check the
@@ -266,10 +270,10 @@ def measure_fluorescence(pathogenInfo, image, bound):
         makeRectangle({bound[1]}, {bound[0]}, {xChange}, {yChange})
         run("Set Measurements...", "mean min redirect=None decimal=3");
         run("Measure");
-        saveAs("Results", "./temp.csv");
+        saveAs("Results", "{savePath}.csv");
     """
     ij.py.run_macro(macro)
-    with open('./temp.csv') as f:
+    with open(savePath + '.csv') as f:
         csvread = csv.reader(f)
         # Obtain the header from the csv.
         header = []
@@ -277,6 +281,8 @@ def measure_fluorescence(pathogenInfo, image, bound):
         # Obtain the next row from the csv.
         row = next(csvread)
         for i in range(0, len(header)):
+            if (header[i] == ' '):
+                continue
             if (header[i] not in pathogenInfo):
             #Create a new value for header[j].
                 pathogenInfo[header[i]] = []
@@ -293,6 +299,8 @@ def extract_pathogen_info(pathogenInfo, imageNum, regionInfo):
     pathogenInfo['area'].append(regionInfo.area)
     pathogenInfo['perimeter'].append(regionInfo.perimeter)
     pathogenInfo['image'].append(imageNum)
+    pathogenInfo['diameter'].append(regionInfo.equivalent_diameter_area)
+    pathogenInfo['circularity'].append(4 * math.pi * regionInfo.area/(regionInfo.perimeter ** 2))
 
 # Extracts information about a specific cell.
 # Arguments:
@@ -306,3 +314,5 @@ def extract_cell_info(cellInfo, imageNum, regionInfo, pathogenNum):
     cellInfo['image'].append(imageNum)
     cellInfo['perimeter'].append(regionInfo.perimeter)
     cellInfo['pathogen_number'].append(pathogenNum)
+    cellInfo['diameter'].append(regionInfo.equivalent_diameter_area)
+    cellInfo['circularity'].append(4 * math.pi * regionInfo.area/(regionInfo.perimeter ** 2))
