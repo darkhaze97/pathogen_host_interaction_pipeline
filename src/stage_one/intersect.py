@@ -7,6 +7,8 @@ import imagej
 import csv
 ij = imagej.init()
 
+from decision_tree import predict
+
 # The function below takes in tuples of pathogen images and cell images (These tuples are generated
 # by label_images_otsu). Overall, it filters out extracellular pathogens, and calculates
 # the number of cells that are infected and not infected.
@@ -146,7 +148,11 @@ def get_intersection_information(pathogenImages, cellImages, savePath):
                 extract_cell_info(cellInfo, i, label, 0)
     if (os.path.exists(savePath + '.csv')):
         os.remove(savePath + '.csv')
-    print(pathogenInfo)
+    
+    # Run the decision tree to determine the number of pathogens in each parasitophorous
+    # vacuole.
+    prepare_decision_tree(pathogenInfo)
+    
     return {'pathogenInfo': pathogenInfo, 'cellInfo': cellInfo}
 
 
@@ -316,3 +322,17 @@ def extract_cell_info(cellInfo, imageNum, regionInfo, pathogenNum):
     cellInfo['pathogen_number'].append(pathogenNum)
     cellInfo['diameter'].append(regionInfo.equivalent_diameter_area)
     cellInfo['circularity'].append(4 * math.pi * regionInfo.area/(regionInfo.perimeter ** 2))
+
+def prepare_decision_tree(pathogenInfo):
+    print(pathogenInfo)
+    arr = np.array([pathogenInfo['area']], dtype=np.uint32)
+    arr = np.append(arr, [pathogenInfo['circularity']], axis=0)
+    arr = np.append(arr, [pathogenInfo['perimeter']], axis=0)
+    arr = np.append(arr, [pathogenInfo['diameter']], axis=0)
+    arr = np.append(arr, [pathogenInfo['Max']], axis=0)
+    arr = np.append(arr, [pathogenInfo['Mean']], axis=0)
+    arr = np.transpose(arr)
+    pred = predict(arr)
+    # Convert predictions from floats into ints
+    pred = list(map(int, pred))
+    pathogenInfo['pathogens_in_vacuole'] = pred

@@ -1,8 +1,15 @@
-import random
 import pandas as pd
 from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
+import pickle
+
+def predict(data):
+    predictions = []
+    with open('./dec_tree.pickle', 'rb') as f:
+        clf = pickle.load(f)
+        predictions = clf.predict(data)
+    return predictions
 
 def import_data(path):
     data = pd.read_csv(
@@ -41,6 +48,8 @@ def build(path):
       
     print("Report : ",
     classification_report(y_test, y_pred))
+    with open('./dec_tree.pickle', 'wb') as f:
+        pickle.dump(clf_gini, f)
 
 if __name__ == '__main__':
     build('../training_decision_tree/Training_dataset_Salmonella_t2hrs.csv')
