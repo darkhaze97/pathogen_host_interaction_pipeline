@@ -20,7 +20,7 @@ statPrinter = {
     'area': lambda info, i: '\nArea: ' + str(round(info['area'][i], 2)) +  u'\u03bcm\u00b2',
     'perimeter': lambda info, i: '\nPerimeter: ' + str(round(info['perimeter'][i], 2)) + u'\u03bcm',
     'circularity': lambda info, i: '\nCircularity: ' + str(round(info['circularity'][i], 3)),
-    'pathogen_number': lambda info, i: '\nNumber of pathogen/vacuole(s): ' + str(info['pathogen_number'][i]),
+    'vacuole_number': lambda info, i: '\nNumber of pathogen/vacuole(s): ' + str(info['vacuole_number'][i]),
     'diameter': lambda info, i: '\nDiameter: ' + str(round(info['diameter'][i], 2)) + u'\u03bcm',
     'Mean': lambda info, i: '\nMean fluorescence: ' + str(info['Mean'][i]),
     'Max': lambda info, i: '\nMax fluorescence: ' + str(info['Max'][i]),

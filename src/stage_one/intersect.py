@@ -18,7 +18,7 @@ from decision_tree import predict
 # returns:
 #   - A dictionary which has the keys 'pathogenInfo' and 'cellInfo'. These map to
 #     values about pathogens and cells. Note that cellInfo['area'][2] and
-#     cellInfo['pathogen_number'][2] are referring to the same cell.
+#     cellInfo['vacuole_number'][2] are referring to the same cell.
 def get_intersection_information(pathogenImages, cellImages, savePath):
     # Relabel all labels to 0 (background) or 1 in both the cell and pathogen images.
     labelledPathogen = []
@@ -71,7 +71,7 @@ def get_intersection_information(pathogenImages, cellImages, savePath):
 
     pathogenInfo = {'bounding_box': [], 'area': [], 'image': [], 'perimeter': [],
                     'diameter': [], 'circularity': []}
-    cellInfo = {'bounding_box': [], 'area': [], 'image': [], 'pathogen_number': [], 'perimeter': [],
+    cellInfo = {'bounding_box': [], 'area': [], 'image': [], 'vacuole_number': [], 'perimeter': [],
                 'diameter': [], 'circularity': []}
 
     # Analyse the properties of each label in each image using regionprops
@@ -319,12 +319,11 @@ def extract_cell_info(cellInfo, imageNum, regionInfo, pathogenNum):
     cellInfo['area'].append(regionInfo.area)
     cellInfo['image'].append(imageNum)
     cellInfo['perimeter'].append(regionInfo.perimeter)
-    cellInfo['pathogen_number'].append(pathogenNum)
+    cellInfo['vacuole_number'].append(pathogenNum)
     cellInfo['diameter'].append(regionInfo.equivalent_diameter_area)
     cellInfo['circularity'].append(4 * math.pi * regionInfo.area/(regionInfo.perimeter ** 2))
 
 def prepare_decision_tree(pathogenInfo):
-    print(pathogenInfo)
     arr = np.array([pathogenInfo['area']], dtype=np.uint32)
     arr = np.append(arr, [pathogenInfo['circularity']], axis=0)
     arr = np.append(arr, [pathogenInfo['perimeter']], axis=0)

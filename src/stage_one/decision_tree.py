@@ -20,7 +20,10 @@ def import_data(path):
         columns=({'Num Pix': 'Area'}),
         inplace=True
     )
-    print(data)
+    # Change all parasite/vacuole that are greater than 4 to be '>4'.
+    # data.loc[data['Parasites/vacuole'] > 4, 'Parasites/vacuole'] = '>4'
+    # Change all parasite/vacuole from int to string.
+    # data['Parasites/vacuole'] = data['Parasites/vacuole'].map(str)
     return data
 
 def build(path):
