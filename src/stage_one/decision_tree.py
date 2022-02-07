@@ -6,7 +6,7 @@ import pickle
 
 def predict(data):
     predictions = []
-    with open('./dec_tree.pickle', 'rb') as f:
+    with open('./stage_one/dec_tree.pickle', 'rb') as f:
         clf = pickle.load(f)
         predictions = clf.predict(data)
     return predictions

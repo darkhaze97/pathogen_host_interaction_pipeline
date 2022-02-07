@@ -8,7 +8,7 @@ import pandas as pd
 import cProfile
 plt.style.use('fivethirtyeight')
 
-from intersect import get_intersection_information
+from .intersect import get_intersection_information
 
 # The function below is to coordinate the analysis of the images. It first labels the
 # images, then finds the intersection of the pathogens with the cell labels. 
@@ -56,7 +56,8 @@ def image_analysis(nucleiPath, pathogenPath, cellPath, threshold, savePath):
         'nucleiImages': nucleiImages,
         'pathogenImages': pathogenImages,
         'cellImages': cellImages,
-        **intersection_info
+        **intersection_info,
+        'readout1': readout1
     }
     
 

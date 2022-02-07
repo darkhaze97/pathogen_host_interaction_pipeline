@@ -7,7 +7,7 @@ import imagej
 import csv
 ij = imagej.init()
 
-from decision_tree import predict
+from .decision_tree import predict
 
 # The function below takes in tuples of pathogen images and cell images (These tuples are generated
 # by label_images_otsu). Overall, it filters out extracellular pathogens, and calculates

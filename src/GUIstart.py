@@ -175,6 +175,8 @@ def main():
 #   - info: Dictionary containing all information generated from image_analysis in image.py
 #   - micronpp: Microns per pixel.
 def change_measurements(info, micronpp):
+    # Change values in readout1, e.g. the mean size of pathogens.
+    info['readout1']['mean_pathogen_size'] = info['readout1']['mean_pathogen_size'] * micronpp * micronpp
     # We do not access 'area' or 'perimeter' directly, for extensibility.
     # We use is_measurement, and also change it if we include any extra measurements,
     # and do not need to change anything in this function.
