@@ -7,7 +7,7 @@ import imagej
 import csv
 ij = imagej.init()
 
-from .decision_tree import predict
+from decision_tree import predict
 
 # The function below takes in tuples of pathogen images and cell images (These tuples are generated
 # by label_images_otsu). Overall, it filters out extracellular pathogens, and calculates
@@ -102,6 +102,9 @@ def get_intersection_information(pathogenImages, cellImages, savePath):
         for label in props:
             # First, obtain the bounding box. This will be used many times later.
             bound = label.bbox
+            
+            plt.imshow(label.image)
+            plt.show()
 
             # Skip the background, as we do not really need to analyse this.
             if (label.label == 0):
