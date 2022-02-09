@@ -7,7 +7,7 @@ There are currently few host-pathogen workflows that use deep learning to analys
 Fluorescence image of pathogen, cells and nuclei from the same field of view.
 
 ### Pipeline
-
+![pipeline](pipeline.drawio.svg)
 
 ### Running the program
 There is a [dataset](https://datadryad.org/stash/dataset/doi:10.5061/dryad.6vq2mp0) that I used to run this pipeline with, which contains the images of the cells, nuclei and pathogens, as well as the training data for a decision tree. In order to correctly run this pipeline, please run at the root directory of this repository: 
