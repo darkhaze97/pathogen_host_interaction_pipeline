@@ -17,5 +17,7 @@ pip install -r requirements.txt
 This will install all the required packages.
 Another software that must be installed is [maven](https://maven.apache.org/).
 
+To begin running the program, change to ./src, and then type into the terminal ```python GUIstart.py```, and follow the prompts.
+
 ### Retraining the decision tree
 If the decision tree is to be trained/retrained, simply change into the ./src/stage_one directory, and run ```python decision_tree.py [training_file_name]```.
