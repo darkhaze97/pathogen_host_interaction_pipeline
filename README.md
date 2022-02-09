@@ -1,11 +1,21 @@
-# pathogen_host_interaction_pipeline
+# Analysing host pathogen interactions with an artificial intelligence pipeline
 
-Hello all! This is a project that I am currently doing for a research scholarship.
+## Problem and introduction
+There are currently few host-pathogen workflows that use deep learning to analyse protein recruitment. This pipeline will analyse high content images of cells, pathogens and nuclei to perform readouts about the replication of pathogens in host cells. In addition, a deep learning model will be used to analyse protein recruitment.
 
-This is going to be a pipeline that allows users to input high content imaging of cells that are infected with specific pathogens. It will return results such as the % infected cells, and also gives information about protein recruitment.
+### Input data
+Fluorescence image of pathogen, cells and nuclei from the same field of view.
 
-This pipeline is based on the HRMAn pipeline in the article: **Defining host–pathogen interactions employing an artificial intelligence workflow**, obtainable at the link: https://elifesciences.org/articles/40560
+### Pipeline
+![pipeline](pipeline.drawio.svg)
 
-I will continue adding updates to this pipeline!
+### Running the program
+There is a [dataset](https://datadryad.org/stash/dataset/doi:10.5061/dryad.6vq2mp0) that I used to run this pipeline with, which contains the images of the cells, nuclei and pathogens, as well as the training data for a decision tree. In order to correctly run this pipeline, please run at the root directory of this repository: 
+```
+pip install -r requirements.txt
+```
+This will install all the required packages.
+Another software that must be installed is [maven](https://maven.apache.org/).
 
-Need to install maven
+### Retraining the decision tree
+If the decision tree is to be trained/retrained, simply change into the ./src/stage_one directory, and run ```python decision_tree.py [training_file_name]```.
