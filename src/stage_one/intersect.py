@@ -326,6 +326,10 @@ def extract_cell_info(cellInfo, imageNum, regionInfo, pathogenNum):
     cellInfo['diameter'].append(regionInfo.equivalent_diameter_area)
     cellInfo['circularity'].append(4 * math.pi * regionInfo.area/(regionInfo.perimeter ** 2))
 
+# The function below simply prepares information to run through the decision tree.
+# It will then obtain the predictions, and place it into the pathogenInfo dictionary.
+# Arguments:
+#   pathogenInfo: The dictionary that contains information about the pathogens
 def prepare_decision_tree(pathogenInfo):
     arr = np.array([pathogenInfo['area']], dtype=np.uint32)
     arr = np.append(arr, [pathogenInfo['circularity']], axis=0)

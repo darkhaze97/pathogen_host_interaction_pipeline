@@ -187,6 +187,12 @@ def apply_clahe(img):
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     return clahe.apply(img)
 
+# The function below is to simply return a dictionary with the readouts for stage 1. It uses all
+# information calculated from previous steps to produce this.
+# Arguments:
+#   info: The dictionary that contains all the measurements we have done.
+# Returns:
+#   A dictionary containing all of the readouts for stage 1.
 def readout(info):
     # Here, info['pathogenInfo']['area']'s length will be used to determine how many vacuoles
     # there are. info['pathogenInfo']['pathogens_in_vacuole'] will be used to determine

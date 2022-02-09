@@ -4,6 +4,12 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
 import pickle
 
+# The function below is used for predicting how many pathogens are in a vacuole.
+# This uses dec_tree.pickle model to predict.
+# Arguments:
+#   data: The data that should be predicted on.
+# Returns:
+#   predictions: A list of predictions for the data that was provided.
 def predict(data):
     predictions = []
     with open('./stage_one/dec_tree.pickle', 'rb') as f:
@@ -11,6 +17,10 @@ def predict(data):
         predictions = clf.predict(data)
     return predictions
 
+# Below is a function to import the training data. It removes specific columns
+# so that we do not consider them when training the decision tree.
+# Arguments:
+#   path: The path to the training data.
 def import_data(path):
     data = pd.read_csv(
         path,
@@ -26,6 +36,11 @@ def import_data(path):
     # data['Parasites/vacuole'] = data['Parasites/vacuole'].map(str)
     return data
 
+# The function below builds the decision tree based on the provided training data
+# in path. The decision tree model will be saved as dec_tree.pickle in the 
+# ./src/stage_one directory.
+# Arguments:
+#   path: The path to the training data.
 def build(path):
     # Build the decision tree
     data = import_data(path)
