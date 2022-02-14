@@ -7,7 +7,7 @@ import imagej
 import csv
 ij = imagej.init()
 
-from decision_tree import predict
+from .decision_tree import predict
 
 # The function below takes in tuples of pathogen images and cell images (These tuples are generated
 # by label_images_otsu). Overall, it filters out extracellular pathogens, and calculates
@@ -61,94 +61,44 @@ def get_intersection_information(pathogenImages, cellImages, savePath):
                      )
         intracellularPathogens[i] = (truthTable == True).astype(int)
 
-    # Now, rejoin the intracellularPathogens with the corresponding cell labels, so that
-    # we can begin counting the number of infected cells and uninfected cells.
-    cellPathogenLabels = []
-    for i in range(0, len(intracellularPathogens)):
-        joinedLabels = segmentation.join_segmentations(intracellularPathogens[i], labelledCell[i])
-        cellPathogenLabel = measure.label(joinedLabels)
-        cellPathogenLabels.append(cellPathogenLabel)
-
     pathogenInfo = {'bounding_box': [], 'area': [], 'image': [], 'perimeter': [],
                     'diameter': [], 'circularity': []}
     cellInfo = {'bounding_box': [], 'area': [], 'image': [], 'vacuole_number': [], 'perimeter': [],
                 'diameter': [], 'circularity': []}
 
-    # Analyse the properties of each label in each image using regionprops
-    for i in range(0, len(cellPathogenLabels)):
-        # We will obtain the region properties, and then scan through these
-        props = measure.regionprops(cellPathogenLabels[i], intensity_image=pathogenImages[i][1])
-        # props will be sorted in ascending order by label number.
-        
-        # For each label, find all the neighbours that are not the background.
-        # This will occur in O(8*q^2*log(p)) time in the general case of
-        # checking. It will be O(8*q^2*(p+1)log(p+1)) if we are inserting into the
-        # neighbours list (defined later). How we obtained the log(p) and (p+1)log(p+1) will
-        # be described in scan_neighbours.
-        # Note: q refers to the size of the bounding box, which will always be less than
-        # 2048, since regions that are adjacent to the edges have been removed. This is the
-        # reason why I used bounding boxes, to limit q. p is referring
-        # to the size of neighbours, and is defined by: 0 <= p < infinity. However, p is
-        # usually never grows too big. 
-        # Overall, if we have n labels to scan through, then our performance will be
-        # O(8*n*q^2*(p+1)log(p+1)). Therefore, this algorithm is limited more by the number of 
-        # labels that we have in an image, rather than how we use our data structures. 
-        # E.g. if we used the RAG data structure defined in skimage, it would take 
-        # approximately 20 seconds to form the data structures for a small set of images.
-        # In our version, it takes about 12 seconds for the same set, which is a 40% increase
-        # in performance. Another rationale behind using this algorithm as compared to the
-        # RAG library in skimage is that we are only interested in looking at the
-        # neighbours. Therefore, there would be unneccessary overhead by using RAG.
-        for label in props:
-            # First, obtain the bounding box. This will be used many times later.
-            bound = label.bbox
-            
-            plt.imshow(label.image)
-            plt.show()
-
-            # Skip the background, as we do not really need to analyse this.
-            if (label.label == 0):
-                continue
-            # Scan through each label, obtain the bounding box, and then scan through
-            # the bounding box in the original image (cellPathogenLabels[i]) to find the
-            # neighbours.
-            # Scan through bound[0] - bound[2] to then scan through bound[1] and bound[3]
-            # to find the label defined by label.label. Then, once we reach the label, we
-            # simply check the neighbours.
-            neighbours = []
-            for row in range(bound[0], bound[2]):
-                for column in range(bound[1], bound[3]):
-                    if (not cellPathogenLabels[i][row][column] == label.label):
-                        continue
-                    # Else, we simply check the neighbours.
-                    scan_neighbours(cellPathogenLabels[i], row, column, label.label, neighbours)
-            
-            # If there are neighbours, then we either have a pathogen or an infected cell. 
-            # This is because the pathogen is touching the cell, and the cell can be touching 
-            # at least one pathogen.
-            #       If current label's area is bigger than all the adjacent labels, then the current label is an
-            #       infected cell.
-            #       Else, we have a pathogen.
-            # Else, if there are no neighbours, then the current label is a non-infected cell
-            if (len(neighbours) >= 1): 
-                currentLabelArea = label.area
-                # Now, scan through the list of adjacent labels, and compare their areas.
-                isCell = True
-                for adjacentLabel in neighbours:
-                    # If an adjacent label has a greater area, then this is a pathogen
-                    if (props[adjacentLabel - 1].area > currentLabelArea):
-                        isCell = False
-                if (isCell):
-                    # If this is a cell, then record the number of pathogens within it as
-                    # well
-                    extract_cell_info(cellInfo, i, label, len(neighbours))
-                else:
+    # Use regionprops_table on the cell labels by supplying the fully intracellular pathogens as an
+    # intensity image. Then apply regionprops_table to find the intensity_mean, where 
+    # intensity_mean > 0 indicates an infected cell, and intensity_mean == 0 indicates a
+    # non-infected cell.
+    # Scan through every intracellular pathogen image, and apply regionprops_table to each
+    # corresponding image.
+    for i in range(0, len(intracellularPathogens)):
+        cellProps = measure.regionprops(cellImages[i][0], intensity_image=intracellularPathogens[i])
+        # Scan through each prop generated, and filter through the intensity_mean.
+        for cell in cellProps:
+            if (cell['intensity_mean'] == 0):
+                extract_cell_info(cellInfo, i, cell, 0)
+            else:
+                bound = cell.bbox
+                # Obtain the bounding box using label.bbox around the fully intracellular pathogens
+                # This is to find how many pathogens are in the cell label.
+                intracellularBoundLabels = intracellularPathogens[i][bound[0]:bound[2], bound[1]:bound[3]]
+                pathogenProps = measure.regionprops(intracellularBoundLabels, intensity_image=cell.image)
+                # Below is a filter to remove all pathogens that have a less than 100%
+                # intensity_mean. (<100% indicates the pathogen is not within the cell.
+                # This can occur if the pathogen is in another cell, but is in the same bounding
+                # box.)
+                pathogenProps = list(filter(filter_one_hundred_mean_intensity, pathogenProps))
+                # Create the cell info, by using the length of pathogenProps as the number
+                # of infected cells within this cell.
+                extract_cell_info(cellInfo, i, cell, len(pathogenProps))
+                # Next, extract information about each pathogen.
+                for pathogen in pathogenProps:
                     # Obtain fluorescence data first. This will be used for the
                     # decision tree later.
                     measure_fluorescence(pathogenInfo, pathogenImages[i], bound, savePath)
-                    extract_pathogen_info(pathogenInfo, i, label)
-            elif (len(neighbours) == 0):
-                extract_cell_info(cellInfo, i, label, 0)
+                    extract_pathogen_info(pathogenInfo, i, pathogen)
+
     if (os.path.exists(savePath + '.csv')):
         os.remove(savePath + '.csv')
     
@@ -157,7 +107,6 @@ def get_intersection_information(pathogenImages, cellImages, savePath):
     prepare_decision_tree(pathogenInfo)
     
     return {'pathogenInfo': pathogenInfo, 'cellInfo': cellInfo}
-
 
 # The function below is to simply scan the immediate neighbours 
 # around a pixel (all 8 pixels around). If a pixel is from a different label,
@@ -342,3 +291,8 @@ def prepare_decision_tree(pathogenInfo):
     # Convert predictions from floats into ints
     pred = list(map(int, pred))
     pathogenInfo['pathogens_in_vacuole'] = pred
+
+def filter_one_hundred_mean_intensity(data):
+    if (data['intensity_mean'] == 1):
+        return True
+    return False
