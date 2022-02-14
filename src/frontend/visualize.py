@@ -26,6 +26,7 @@ statPrinter = {
     'Max': lambda info, i: '\nMax fluorescence: ' + str(info['Max'][i]),
     'Min': lambda info, i: '\nMin fluorescence: ' + str(info['Min'][i]),
     'pathogens_in_vacuole': lambda info, i: '\nPathogens in the vacuole: ' + str(info['pathogens_in_vacuole'][i]),
+    'dist_nuclear_centroid': lambda info, i: '\nDistance from nucleus: ' + str(round(info['dist_nuclear_centroid'][i], 2)) + u'\u03bcm',
     # Place the unused stats below, and follow the same structure as used for bounding_box
     # and image
     'bounding_box': lambda info, i: '',

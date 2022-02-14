@@ -27,7 +27,7 @@ def image_analysis(nucleiPath, pathogenPath, cellPath, threshold, savePath):
     pathogenImages = label_pathogen_images(pathogenPath, threshold)
     cellImages = label_cell_images(cellPath, nucleiImages, threshold)
     
-    intersection_info = get_intersection_information(pathogenImages, cellImages, savePath)
+    intersection_info = get_intersection_information(pathogenImages, cellImages, nucleiImages, savePath)
     # Generate information about whether the cells are infected, and the number of
     # pathogens in the cell. In addition, generate information on the pathogens.
     # cProfile.runctx('get_intersection_information(pathogenImages, cellImages)', {'get_intersection_information': get_intersection_information}, {'pathogenImages': pathogenImages, 'cellImages': cellImages}, filename='report.txt' )
@@ -203,13 +203,14 @@ def readout(info):
     # Use info['cellInfo']['vacuole_number']
     vacNum = sum(info['cellInfo']['vacuole_number'])
     cellNum = len(info['cellInfo']['vacuole_number'])
+    patNum = sum(info['pathogenInfo']['pathogens_in_vacuole'])
     
     percentInf = len([elem for elem in info['cellInfo']['vacuole_number'] if elem > 0])\
                     /cellNum if not cellNum == 0 else 0
     # Calculate Vacuole : Cells ratio
     vacCellRat = len(info['pathogenInfo']['area'])/cellNum if not cellNum == 0 else 0
     # Calculate pathogen load.
-    patLoad = sum(info['pathogenInfo']['pathogens_in_vacuole'])/cellNum if not cellNum == 0 else 0
+    patLoad = patNum/cellNum if not cellNum == 0 else 0
     # Calculate infection levels
     infectLevel = {
         '0': len([elem for elem in info['cellInfo']['vacuole_number'] if elem == 0])\
@@ -229,6 +230,9 @@ def readout(info):
     }
     # Calculate mean pathogen size
     meanPatSize = sum(info['pathogenInfo']['area'])/vacNum if not vacNum == 0 else 0
+    # Calculate the mean vacuole position.
+    vacPosition = sum(info['pathogenInfo']['dist_nuclear_centroid'])/vacNum if not vacNum == 0\
+                  else 0
     # Calculate number of vacuoles that have replicating pathogens.
     percentRep = len([elem for elem in info['pathogenInfo']['pathogens_in_vacuole'] if elem > 1])\
                     /vacNum if not vacNum == 0 else 0
@@ -250,7 +254,7 @@ def readout(info):
         'pathogen_load': patLoad,
         'infection_levels': infectLevel,
         'mean_pathogen_size': meanPatSize,
-        'vacuole_position': None,
+        'vacuole_position': vacPosition,
         'percent_replicating_pathogens': percentRep,
         'replication_distribution': repDist
     }

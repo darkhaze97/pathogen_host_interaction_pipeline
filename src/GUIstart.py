@@ -201,7 +201,7 @@ def change_measurements_entity(info, micronpp, entityInfo):
         print('This entity is not in the info dictionary. Please contact creator.')
         return
     for key in info[entityInfo]:
-        if (key == 'perimeter' or key == 'diameter'):
+        if (key == 'perimeter' or key == 'diameter' or key == 'dist_nuclear_centroid'):
             for i in range(0, len(info[entityInfo][key])):
                 info[entityInfo][key][i] = info[entityInfo][key][i] * micronpp
         elif (key == 'area'):

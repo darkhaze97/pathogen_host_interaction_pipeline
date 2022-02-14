@@ -19,7 +19,7 @@ from .decision_tree import predict
 #   - A dictionary which has the keys 'pathogenInfo' and 'cellInfo'. These map to
 #     values about pathogens and cells. Note that cellInfo['area'][2] and
 #     cellInfo['vacuole_number'][2] are referring to the same cell.
-def get_intersection_information(pathogenImages, cellImages, savePath):
+def get_intersection_information(pathogenImages, cellImages, nucleiImages, savePath):
     # Relabel all labels to 0 (background) or 1 in both the cell and pathogen images.
     labelledPathogen = []
     labelledCell = []
@@ -62,14 +62,15 @@ def get_intersection_information(pathogenImages, cellImages, savePath):
         intracellularPathogens[i] = (truthTable == True).astype(int)
 
     pathogenInfo = {'bounding_box': [], 'area': [], 'image': [], 'perimeter': [],
-                    'diameter': [], 'circularity': []}
+                    'diameter': [], 'circularity': [], 'dist_nuclear_centroid': []}
     cellInfo = {'bounding_box': [], 'area': [], 'image': [], 'vacuole_number': [], 'perimeter': [],
                 'diameter': [], 'circularity': []}
 
     # Use regionprops_table on the cell labels by supplying the fully intracellular pathogens as an
     # intensity image. Then apply regionprops_table to find the intensity_mean, where 
     # intensity_mean > 0 indicates an infected cell, and intensity_mean == 0 indicates a
-    # non-infected cell.
+    # non-infected cell. In addition, match nuclei with each infected cell, to find the
+    # dist_nuclear_centroid for the pathogens.
     # Scan through every intracellular pathogen image, and apply regionprops_table to each
     # corresponding image.
     for i in range(0, len(intracellularPathogens)):
@@ -81,7 +82,19 @@ def get_intersection_information(pathogenImages, cellImages, savePath):
             else:
                 bound = cell.bbox
                 # Obtain the bounding box using label.bbox around the fully intracellular pathogens
-                # This is to find how many pathogens are in the cell label.
+                # and the nuclei images to attempt to find the nucleus matching the corresponding
+                # cell.
+                nucleiBoundLabels = nucleiImages[i][0][bound[0]:bound[2], bound[1]: bound[3]]
+                # Find the nucleus with 100% intensity_mean when using the cell label as an intensity
+                # image.
+                nucleiProps = measure.regionprops(nucleiBoundLabels, intensity_image=cell.image)
+                nucleiProps = list(filter(filter_one_hundred_mean_intensity, nucleiProps))
+                # If the nucleiProps length is not one, it does not matter, always choose the first
+                # element in nucleiProps. The size of nucleiProps should always be of at least size
+                # 1.
+                nuclearCentroid = nucleiProps[0]['centroid']
+                
+                # Below is to find how many pathogens are in the cell label.
                 intracellularBoundLabels = intracellularPathogens[i][bound[0]:bound[2], bound[1]:bound[3]]
                 pathogenProps = measure.regionprops(intracellularBoundLabels, intensity_image=cell.image)
                 # Below is a filter to remove all pathogens that have a less than 100%
@@ -97,7 +110,7 @@ def get_intersection_information(pathogenImages, cellImages, savePath):
                     # Obtain fluorescence data first. This will be used for the
                     # decision tree later.
                     measure_fluorescence(pathogenInfo, pathogenImages[i], bound, savePath)
-                    extract_pathogen_info(pathogenInfo, i, pathogen)
+                    extract_pathogen_info(pathogenInfo, i, pathogen, nuclearCentroid)
 
     if (os.path.exists(savePath + '.csv')):
         os.remove(savePath + '.csv')
@@ -252,13 +265,17 @@ def measure_fluorescence(pathogenInfo, image, bound, savePath):
 #                   'global' data)
 #   - ogImage: Original image that the pathogen comes from
 #   - regionInfo: Information about the pathogen that will be added to pathogenInfo
-def extract_pathogen_info(pathogenInfo, imageNum, regionInfo):
+#   - nuclearCentroid: The centroid for the nucleus that the pathogen is in.
+def extract_pathogen_info(pathogenInfo, imageNum, regionInfo, nuclearCentroid):
     pathogenInfo['bounding_box'].append(regionInfo.bbox)
     pathogenInfo['area'].append(regionInfo.area)
     pathogenInfo['perimeter'].append(regionInfo.perimeter)
     pathogenInfo['image'].append(imageNum)
     pathogenInfo['diameter'].append(regionInfo.equivalent_diameter_area)
     pathogenInfo['circularity'].append(4 * math.pi * regionInfo.area/(regionInfo.perimeter ** 2))
+    dist = math.sqrt((nuclearCentroid[0] - regionInfo.centroid[0]) ** 2 +\
+                     (nuclearCentroid[1] - regionInfo.centroid[1]) ** 2)
+    pathogenInfo['dist_nuclear_centroid'].append(dist)
 
 # Extracts information about a specific cell.
 # Arguments:
