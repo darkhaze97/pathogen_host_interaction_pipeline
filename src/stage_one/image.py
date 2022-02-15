@@ -128,32 +128,34 @@ def label_images_otsu(path, nucleiImages, threshold):
         # Remove elements on the border. 
         alteredImg = clear_border(alteredImg)
         
-        # If nucleiImages are provided, combine the labelImg with the nucleiLabel.
-        # Note that nucleiImage[0] corresponds to the nucleiLabel that was accessed first.
-        if (not nucleiImages == None):
-            alteredImg = combine_cell_nuclei_label(alteredImg, nucleiImages[i][0])
-            i = i + 1
-
-        # Convert the alteredImg into a boolean array. Then we are able to remove 
-        # small objects.
-        labelImg = alteredImg > 0
+        alteredImg = measure.label(alteredImg, connectivity=greyImage.ndim)
         
         # Remove small objects in the altered image. The minimal size will be based on if the
         # image was a pathogen, cell or nucleus. A larger minimal value is needed for
         # the cell, since there can be a lot of noise in these photos compared to the nuclei
         # or pathogens.
-        labelImg = morphology.remove_small_objects(labelImg, 2000) if (not nucleiImages == None) \
-                        else morphology.remove_small_objects(labelImg, 100)
-
+        alteredImg = morphology.remove_small_objects(alteredImg, 2000) if (not nucleiImages == None) \
+                else morphology.remove_small_objects(alteredImg, 100)
+        
+        # origCellImg will hold the original cell image. It will be updated when we are 
+        # scanning for cell images.
+        origCellImg = None
+        # If nucleiImages are provided, combine the labelImg with the nucleiLabel.
+        # Note that nucleiImage[0] corresponds to the nucleiLabel that was accessed first.
+        if (not nucleiImages == None):
+            origCellImg = np.copy(alteredImg)
+            alteredImg = combine_cell_nuclei_label(alteredImg, nucleiImages[i][0])
+            i = i + 1
+        
         # Then, remove holes that are within labels.
-        labelImg = morphology.remove_small_holes(labelImg, 1000)
+        alteredImg = morphology.remove_small_holes(alteredImg, 1000)
         
         # Place unique labels on segmented areas
-        labelImg = measure.label(labelImg, connectivity=greyImage.ndim) 
+        labelImg = measure.label(alteredImg, connectivity=greyImage.ndim)
 
-        # plt.imshow(labelImg)
-        # plt.show()
-        images.append((labelImg, greyImage, imagePath))
+        # For the pathogen and nuclei images, we do not need to access the 3rd index
+        # of the tuple.
+        images.append((labelImg, greyImage, imagePath, origCellImg))
     return images
 
 # The function below simply combines the labelling of the nuclei and the cells.
