@@ -4,11 +4,13 @@ import matplotlib.pyplot as plt
 import cv2
 from skimage import measure, segmentation, morphology
 from skimage.segmentation import clear_border
+from scipy.spatial import Voronoi, voronoi_plot_2d, Delaunay
 import pandas as pd
 import cProfile
+
 plt.style.use('fivethirtyeight')
 
-from .intersect import get_intersection_information
+from intersect import get_intersection_information
 
 # The function below is to coordinate the analysis of the images. It first labels the
 # images, then finds the intersection of the pathogens with the cell labels. 
@@ -134,9 +136,9 @@ def label_images_otsu(path, nucleiImages, threshold):
         # image was a pathogen, cell or nucleus. A larger minimal value is needed for
         # the cell, since there can be a lot of noise in these photos compared to the nuclei
         # or pathogens.
-        alteredImg = morphology.remove_small_objects(alteredImg, 2000) if (not nucleiImages == None) \
+        alteredImg = morphology.remove_small_objects(alteredImg, 5000) if (not nucleiImages == None) \
                 else morphology.remove_small_objects(alteredImg, 100)
-        
+
         # origCellImg will hold the original cell image. It will be updated when we are 
         # scanning for cell images.
         origCellImg = None
@@ -145,13 +147,42 @@ def label_images_otsu(path, nucleiImages, threshold):
         if (not nucleiImages == None):
             origCellImg = np.copy(alteredImg)
             alteredImg = combine_cell_nuclei_label(alteredImg, nucleiImages[i][0])
-            i = i + 1
-        
+
         # Then, remove holes that are within labels.
         alteredImg = morphology.remove_small_holes(alteredImg, 1000)
-        
+
         # Place unique labels on segmented areas
         labelImg = measure.label(alteredImg, connectivity=greyImage.ndim)
+        
+        # Now, we perform more processing if we are currently analysing cell images.
+        if (not nucleiImages == None):
+            # A new labelled image also has to be created, as the nuclei labels are being removed.
+            dim = np.shape(labelImg)
+            newLabelImg = np.zeros((dim[0], dim[1]))
+            
+            process_cell(labelImg, origCellImg, nucleiImages[i][0], newLabelImg)
+            
+            labelImg = measure.label(newLabelImg)
+            plt.imshow(labelImg)
+            plt.show()
+            i = i + 1
+            
+        
+        # plt.imshow(labelImg)
+        # plt.show()
+        
+        # # Scan through each label, and try to change the image! Just doing random.
+        # if (not nucleiImages == None):
+        #     info = measure.regionprops(labelImg)
+        #     for label in info:
+        #         # Get the bounds of the label.
+        #         bounds = label.bbox
+        #         plt.imshow(labelImg[bounds[0]:bounds[2], bounds[1]:bounds[3]])
+        #         plt.show()
+        #         yes = labelImg[bounds[0]:bounds[2], bounds[1]:bounds[3]]
+        #         yes = np.where(yes == 0, 10, yes + 1)
+        #         plt.imshow(yes)
+        #         plt.show()
 
         # For the pathogen and nuclei images, we do not need to access the 3rd index
         # of the tuple.
@@ -188,6 +219,86 @@ def combine_cell_nuclei_label(cellLabel, nucleiLabel):
 def apply_clahe(img):
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     return clahe.apply(img)
+
+
+def process_cell(labelImg, origCellImg, nucleiImage, newLabelImg):
+    # First, we need to remove any nuclei only labels. Perform a regionprops
+    # to obtain information about each cell label.
+    cellProps = measure.regionprops(labelImg)
+
+    # Then, scan through each region, and apply a regionprops to each cell,
+    # and use the original Cell image as an intensity image to find out if the
+    # current label is a cell label.
+    for cell in cellProps:
+        bound = cell.bbox
+        # cellImg = (cell['image'] == True).astype(int)
+        cellImg = np.where(cell['image'] == True, cell.label, 0)
+        intensityImg = np.where(cell['image'] == True, 1, 0)
+        assertCell = measure.regionprops(cellImg,
+                                         intensity_image=origCellImg[bound[0]:bound[2], bound[1]:bound[3]])
+        # If statement below only considers 'true' cell labels. E.g. when we combined the
+        # nuclei and the cell labels, if there were any fake cell labels (nuclei) by themselves,
+        # they would not have any intensity with the original cell image.
+        if (assertCell[0]['intensity_mean'] == 0):
+            continue
+        # If we reach here, we are in a true cell label.
+        # First, check if we need to separate cells that are touching each other.
+        # If there is more than one nuclei in the cell, then voronoi segmentation
+        # needs to be performed.
+        # Take the bounding box from the nuclei images, and find the nuclei that overlap
+        # with the cell.
+        nucleiBox = nucleiImage[bound[0]:bound[2], bound[1]:bound[3]]
+        nucleiProps = measure.regionprops(nucleiBox,
+                                          intensity_image=intensityImg
+                                         )
+        
+        # Obtain the centroids of the nuclei that have a 100% intensity
+        # overlap with cellImg.
+        centroidList = []
+        for nucleus in nucleiProps:
+            if (nucleus['intensity_mean'] == 1):
+                centroidList.append(list(nucleus.centroid))
+        
+        # If the size of nucleiProps is not at least 1, then continue.
+        if (len(centroidList) == 0):
+            continue
+
+        # Separate below into a separate voronoi function
+
+        # Else, we have the number of nuclei in the cell. If the number of nuclei
+        # exceeds 1, perform a voronoi segmentation.
+        # BIG NOTE: FOR 2 NUCLEI, PRETTY SIMPLE TO DO. JUST DO A PERP
+        # LINE THROUGH THE LINE BETWEEN THE POINTS
+        if (not len(centroidList) == 1):
+            # print(centroidList)
+            # plt.imshow(cellImg)
+            # plt.show()
+            # plt.imshow(nucleiBox)
+            # plt.show()
+            # Create a voronoi diagram with centroidList.
+            inputPoints = np.array(centroidList)
+            # vor = Voronoi(inputPoints)
+            # voronoi_plot_2d(vor)
+            # plt.show()
+            # tri = Delaunay(inputPoints)
+            # plt.triplot(inputPoints[:,0], inputPoints[:,1], tri.simplices)
+            # plt.plot(inputPoints[:,0], inputPoints[:,1], 'o')
+            # plt.show()
+        
+        # Add the label to the new labelled image.
+        boundBox = newLabelImg[bound[0]:bound[2], bound[1]:bound[3]]
+        # If a specific pixel in the newLabelImg is of label 0, we can add freely to it. However,
+        # if it is not 0, this means that this region can be potentially lost. Therefore,
+        # the corresponding pixels from the region have been added back in.
+        newLabelImg[bound[0]:bound[2], bound[1]:bound[3]] = np.where(boundBox == 0, cellImg, boundBox)
+        
+        # NOTE: MAYBE SCAN THROUGH EACH CELL LABEL, THEN TAKE THE NUCLEI IMAGES
+        # WITH THE SAME BOUNDING BOX, AND THEN OBTAIN THE NUCLEI
+        # THAT ARE OVERLAPPING WITH THE CELL LABEL. THEN PERFORM VORONOI SEGMENTATION
+        # ON THE CENTROIDS. OVERLAP REGIONS, AND THE SECTIONS OF THE CELLS IN THE DIFF
+        # REGIONS CORRESPOND TO DIFF CELLS. NOTE THAT THIS SHOULD NOT RUN ON A CELL
+        # WITH ONE NUCLEUS.
+    
 
 # The function below is to simply return a dictionary with the readouts for stage 1. It uses all
 # information calculated from previous steps to produce this.

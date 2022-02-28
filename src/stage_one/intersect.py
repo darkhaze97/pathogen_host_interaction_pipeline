@@ -7,7 +7,8 @@ import imagej
 import csv
 ij = imagej.init()
 
-from .decision_tree import predict
+from decision_tree import predict
+from helper import filter_one_hundred_mean_intensity
 
 # The function below takes in tuples of pathogen images and cell images (These tuples are generated
 # by label_images_otsu). Overall, it filters out extracellular pathogens, and calculates
@@ -99,10 +100,8 @@ def get_intersection_information(pathogenImages, cellImages, nucleiImages, saveP
                 # Find the nucleus with 100% intensity_mean when using the cell label as an intensity
                 # image.
                 nucleiProps = measure.regionprops(nucleiBoundLabels, intensity_image=cell.image)
-                nucleiProps = list(filter(filter_one_hundred_mean_intensity, nucleiProps))
-                # If the nucleiProps length is not one, it does not matter, always choose the first
-                # element in nucleiProps. The size of nucleiProps should always be of at least size
-                # 1.
+                # The size of nucleiProps should always be of at size 1, as we have accounted
+                # for any multinuclear cell label in image.py.
                 nuclearCentroid = nucleiProps[0]['centroid']
                 
                 # Below is to find how many pathogens are in the cell label.
@@ -319,8 +318,3 @@ def prepare_decision_tree(pathogenInfo):
     # Convert predictions from floats into ints
     pred = list(map(int, pred))
     pathogenInfo['pathogens_in_vacuole'] = pred
-
-def filter_one_hundred_mean_intensity(data):
-    if (data['intensity_mean'] == 1):
-        return True
-    return False

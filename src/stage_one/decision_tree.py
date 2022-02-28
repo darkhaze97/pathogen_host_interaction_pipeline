@@ -3,6 +3,7 @@ from sklearn.metrics import confusion_matrix, accuracy_score, classification_rep
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
 import pickle
+import os
 
 # The function below is used for predicting how many pathogens are in a vacuole.
 # This uses dec_tree.pickle model to predict.
@@ -12,9 +13,14 @@ import pickle
 #   predictions: A list of predictions for the data that was provided.
 def predict(data):
     predictions = []
-    with open('./stage_one/dec_tree.pickle', 'rb') as f:
-        clf = pickle.load(f)
-        predictions = clf.predict(data)
+    if (os.path.isfile('./dec_tree.pickle')):
+        with open('./dec_tree.pickle', 'rb') as f:
+            clf = pickle.load(f)
+            predictions = clf.predict(data)
+    else:
+        with open('./stage_one/dec_tree.pickle', 'rb') as f:
+            clf = pickle.load(f)
+            predictions = clf.predict(data)
     return predictions
 
 # Below is a function to import the training data. It removes specific columns
