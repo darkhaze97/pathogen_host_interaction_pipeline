@@ -1,4 +1,4 @@
-# Note: This is still a work in progress.
+# Note: This project is still a work in progress.
 # Analysing host pathogen interactions with an artificial intelligence pipeline
 
 ## Problem and introduction
