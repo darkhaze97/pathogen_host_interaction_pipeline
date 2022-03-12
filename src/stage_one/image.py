@@ -11,6 +11,7 @@ import cProfile
 plt.style.use('fivethirtyeight')
 
 from intersect import get_intersection_information
+from voronoi import voronoi_seg
 
 # The function below is to coordinate the analysis of the images. It first labels the
 # images, then finds the intersection of the pathogens with the cell labels. 
@@ -269,21 +270,12 @@ def process_cell(labelImg, origCellImg, nucleiImage, newLabelImg):
         # exceeds 1, perform a voronoi segmentation.
         # BIG NOTE: FOR 2 NUCLEI, PRETTY SIMPLE TO DO. JUST DO A PERP
         # LINE THROUGH THE LINE BETWEEN THE POINTS
-        if (not len(centroidList) == 1):
-            # print(centroidList)
-            # plt.imshow(cellImg)
-            # plt.show()
-            # plt.imshow(nucleiBox)
-            # plt.show()
-            # Create a voronoi diagram with centroidList.
-            inputPoints = np.array(centroidList)
-            # vor = Voronoi(inputPoints)
-            # voronoi_plot_2d(vor)
-            # plt.show()
-            # tri = Delaunay(inputPoints)
-            # plt.triplot(inputPoints[:,0], inputPoints[:,1], tri.simplices)
-            # plt.plot(inputPoints[:,0], inputPoints[:,1], 'o')
-            # plt.show()
+        if (len(centroidList) == 2):
+            print('')
+        elif (len(centroidList) > 2):
+            plt.imshow(cellImg)
+            plt.show()
+            voronoi_seg(centroidList, np.shape(cellImg))
         
         # Add the label to the new labelled image.
         boundBox = newLabelImg[bound[0]:bound[2], bound[1]:bound[3]]
