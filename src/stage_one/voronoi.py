@@ -62,7 +62,7 @@ def voronoi_seg(centroidList, shape):
         for (p2, v1, v2) in ridges[p1]:
             if (v1 == -1 or v2 == -1):
                 # Add the return from the function to allVertices and ridgeVertices
-                edgeVertex = determine_edge_vertex(p1, p2, v1, v2, shape)
+                edgeVertex = determine_edge_vertex(p1, p2, v1, v2, shape, vor)
                 
     
     print(vor.points)
@@ -75,7 +75,7 @@ def voronoi_seg(centroidList, shape):
     plt.show()
 
 # The function below should return a valid vertex.
-def determine_edge_vertex(p1, p2, v1, v2, shape):
+def determine_edge_vertex(p1, p2, v1, v2, shape, vor):
     # Decide which edge the ridge collides with 
     # (left [0], right [defined in shape[1] - 1], top [defined in shape[0] -1], 
     # bottom [0])
