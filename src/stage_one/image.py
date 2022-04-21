@@ -12,6 +12,8 @@ plt.style.use('fivethirtyeight')
 
 from intersect import get_intersection_information
 from voronoi import voronoi_seg
+from readout1 import readout
+from helper import obtain_file_names
 
 # The function below is to coordinate the analysis of the images. It first labels the
 # images, then finds the intersection of the pathogens with the cell labels. 
@@ -111,10 +113,9 @@ def label_images_otsu(path, nucleiImages, threshold):
     images = []
     # i is the index to calculate which nucleiImage we are up to (if we are currently
     # attempting to label the cell images.)
-    i = 0
     # Obtain the file names in the directory dictated by path
     pathNames = obtain_file_names(path)
-    for imagePath in pathNames:
+    for i, imagePath in enumerate(pathNames):
         image = cv2.imread(imagePath)
         greyImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
@@ -128,35 +129,18 @@ def label_images_otsu(path, nucleiImages, threshold):
                           if (threshold == None) else \
                           cv2.threshold(src=greyImage, thresh=threshold, maxval=255, type=cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         
-        # Remove elements on the border. 
-        alteredImg = clear_border(alteredImg)
-        
-        alteredImg = measure.label(alteredImg, connectivity=greyImage.ndim)
-        
-        # Remove small objects in the altered image. The minimal size will be based on if the
-        # image was a pathogen, cell or nucleus. A larger minimal value is needed for
-        # the cell, since there can be a lot of noise in these photos compared to the nuclei
-        # or pathogens.
-        alteredImg = morphology.remove_small_objects(alteredImg, 5000) if (not nucleiImages == None) \
-                else morphology.remove_small_objects(alteredImg, 100)
-
-        # origCellImg will hold the original cell image. It will be updated when we are 
-        # scanning for cell images.
-        origCellImg = None
-        # If nucleiImages are provided, combine the labelImg with the nucleiLabel.
-        # Note that nucleiImage[0] corresponds to the nucleiLabel that was accessed first.
-        if (not nucleiImages == None):
-            origCellImg = np.copy(alteredImg)
-            alteredImg = combine_cell_nuclei_label(alteredImg, nucleiImages[i][0])
-
-        # Then, remove holes that are within labels.
-        alteredImg = morphology.remove_small_holes(alteredImg, 1000)
+        # Cleanup the image.
+        alteredImg = segment_cleanup(alteredImg, greyImage, not nucleiImages == None)
 
         # Place unique labels on segmented areas
         labelImg = measure.label(alteredImg, connectivity=greyImage.ndim)
         
         # Now, we perform more processing if we are currently analysing cell images.
         if (not nucleiImages == None):
+            origCellImg = np.copy(alteredImg)
+            alteredImg = combine_cell_nuclei_label(alteredImg, nucleiImages[i][0])
+            labelImg = measure.label(alteredImg, connectivity=greyImage.ndim)
+            
             # A new labelled image also has to be created, as the nuclei labels are being removed.
             dim = np.shape(labelImg)
             newLabelImg = np.zeros((dim[0], dim[1]))
@@ -164,31 +148,35 @@ def label_images_otsu(path, nucleiImages, threshold):
             process_cell(labelImg, origCellImg, nucleiImages[i][0], newLabelImg)
             
             labelImg = measure.label(newLabelImg)
-            plt.imshow(labelImg)
-            plt.show()
-            i = i + 1
             
-        
         # plt.imshow(labelImg)
         # plt.show()
-        
-        # # Scan through each label, and try to change the image! Just doing random.
-        # if (not nucleiImages == None):
-        #     info = measure.regionprops(labelImg)
-        #     for label in info:
-        #         # Get the bounds of the label.
-        #         bounds = label.bbox
-        #         plt.imshow(labelImg[bounds[0]:bounds[2], bounds[1]:bounds[3]])
-        #         plt.show()
-        #         yes = labelImg[bounds[0]:bounds[2], bounds[1]:bounds[3]]
-        #         yes = np.where(yes == 0, 10, yes + 1)
-        #         plt.imshow(yes)
-        #         plt.show()
 
         # For the pathogen and nuclei images, we do not need to access the 3rd index
         # of the tuple.
-        images.append((labelImg, greyImage, imagePath, origCellImg))
+        images.append((labelImg, greyImage, imagePath))
     return images
+
+# ================= TODO =========================
+def segment_cleanup(alteredImg, greyImage, isCell):
+    # Remove elements on the border. 
+    alteredImg = clear_border(alteredImg)
+    
+    # We label the image here, so that we can correctly use
+    # remove_small_objects and remove_small_holes
+    alteredImg = measure.label(alteredImg, connectivity=greyImage.ndim)
+    
+    # Remove small objects in the altered image. The minimal size will be based on if the
+    # image was a pathogen, cell or nucleus. A larger minimal value is needed for
+    # the cell, since there can be a lot of noise in these photos compared to the nuclei
+    # or pathogens.
+    alteredImg = morphology.remove_small_objects(alteredImg, 100) if (not isCell) else \
+                 morphology.remove_small_objects(alteredImg, 5000)
+
+    # Then, remove holes that are within labels.
+    alteredImg = morphology.remove_small_holes(alteredImg, 1000)
+    
+    return alteredImg
 
 # The function below simply combines the labelling of the nuclei and the cells.
 # This is to fill in the 'hole' in cell images, where the nuclei is not visible.
@@ -220,7 +208,6 @@ def combine_cell_nuclei_label(cellLabel, nucleiLabel):
 def apply_clahe(img):
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     return clahe.apply(img)
-
 
 def process_cell(labelImg, origCellImg, nucleiImage, newLabelImg):
     # First, we need to remove any nuclei only labels. Perform a regionprops
@@ -273,15 +260,18 @@ def process_cell(labelImg, origCellImg, nucleiImage, newLabelImg):
         if (len(centroidList) == 2):
             print('')
         elif (len(centroidList) > 2):
-            plt.imshow(cellImg)
-            plt.show()
+            # plt.imshow(cellImg)
+            # plt.show()
             voronoi_seg(centroidList, np.shape(cellImg))
         
         # Add the label to the new labelled image.
         boundBox = newLabelImg[bound[0]:bound[2], bound[1]:bound[3]]
-        # If a specific pixel in the newLabelImg is of label 0, we can add freely to it. However,
-        # if it is not 0, this means that this region can be potentially lost. Therefore,
-        # the corresponding pixels from the region have been added back in.
+        # If a specific pixel in the newLabelImg is of label 0, we can add the cell label
+        # bounded by bound[0]:bound[2] and bound[1]:bound[3] freely to it. However,
+        # if there is a pixel in this box that is not originally 0 and is not the label
+        # of the current cell being analysed, this means that this 
+        # region can be potentially lost. Therefore, the corresponding pixels from the 
+        # region have been added back in.
         newLabelImg[bound[0]:bound[2], bound[1]:bound[3]] = np.where(boundBox == 0, cellImg, boundBox)
         
         # NOTE: MAYBE SCAN THROUGH EACH CELL LABEL, THEN TAKE THE NUCLEI IMAGES
@@ -290,110 +280,6 @@ def process_cell(labelImg, origCellImg, nucleiImage, newLabelImg):
         # ON THE CENTROIDS. OVERLAP REGIONS, AND THE SECTIONS OF THE CELLS IN THE DIFF
         # REGIONS CORRESPOND TO DIFF CELLS. NOTE THAT THIS SHOULD NOT RUN ON A CELL
         # WITH ONE NUCLEUS.
-    
-
-# The function below is to simply return a dictionary with the readouts for stage 1. It uses all
-# information calculated from previous steps to produce this.
-# Arguments:
-#   info: The dictionary that contains all the measurements we have done.
-# Returns:
-#   A dictionary containing all of the readouts for stage 1.
-def readout(info):
-    # Here, info['pathogenInfo']['area']'s length will be used to determine how many vacuoles
-    # there are. info['pathogenInfo']['pathogens_in_vacuole'] will be used to determine
-    # the number of pathogens in each vacuole.
-    # info['cellInfo']['vacuole_number'] will be used to determine how many
-    # cells there are.
-    # Calculate % infected cells: n(infected)/n(non-infected)
-    # Use info['cellInfo']['vacuole_number']
-    vacNum = sum(info['cellInfo']['vacuole_number'])
-    cellNum = len(info['cellInfo']['vacuole_number'])
-    patNum = sum(info['pathogenInfo']['pathogens_in_vacuole'])
-    
-    percentInf = len([elem for elem in info['cellInfo']['vacuole_number'] if elem > 0])\
-                    /cellNum if not cellNum == 0 else 0
-    # Calculate Vacuole : Cells ratio
-    vacCellRat = len(info['pathogenInfo']['area'])/cellNum if not cellNum == 0 else 0
-    # Calculate pathogen load.
-    patLoad = patNum/cellNum if not cellNum == 0 else 0
-    # Calculate infection levels
-    infectLevel = {
-        '0': len([elem for elem in info['cellInfo']['vacuole_number'] if elem == 0])\
-                    /cellNum if not cellNum == 0 else 0,
-        '1': len([elem for elem in info['cellInfo']['vacuole_number'] if elem == 1])\
-                    /cellNum if not cellNum == 0 else 0,
-        '2': len([elem for elem in info['cellInfo']['vacuole_number'] if elem == 2])\
-                    /cellNum if not cellNum == 0 else 0,
-        '3': len([elem for elem in info['cellInfo']['vacuole_number'] if elem == 3])\
-                    /cellNum if not cellNum == 0 else 0,
-        '4': len([elem for elem in info['cellInfo']['vacuole_number'] if elem == 4])\
-                    /cellNum if not cellNum == 0 else 0,
-        '5': len([elem for elem in info['cellInfo']['vacuole_number'] if elem == 5])\
-                    /cellNum if not cellNum == 0 else 0,
-        '5+': len([elem for elem in info['cellInfo']['vacuole_number'] if elem > 5])\
-                    /cellNum if not cellNum == 0 else 0,
-    }
-    # Calculate mean pathogen size
-    meanPatSize = sum(info['pathogenInfo']['area'])/vacNum if not vacNum == 0 else 0
-    # Calculate the mean vacuole position.
-    vacPosition = sum(info['pathogenInfo']['dist_nuclear_centroid'])/vacNum if not vacNum == 0\
-                  else 0
-    # Calculate number of vacuoles that have replicating pathogens.
-    percentRep = len([elem for elem in info['pathogenInfo']['pathogens_in_vacuole'] if elem > 1])\
-                    /vacNum if not vacNum == 0 else 0
-    # Calculate the replication distribution. I.e. how many vacuoles have one pathogen,
-    # how many vacuoles have two pathogens, etc.
-    repDist = {
-        '1': len([elem for elem in info['pathogenInfo']['pathogens_in_vacuole'] if elem == 1])\
-                    /vacNum if not vacNum == 0 else 0,
-        '2': len([elem for elem in info['pathogenInfo']['pathogens_in_vacuole'] if elem == 2])\
-                    /vacNum if not vacNum == 0 else 0,
-        '4': len([elem for elem in info['pathogenInfo']['pathogens_in_vacuole'] if elem == 4])\
-                    /vacNum if not vacNum == 0 else 0,
-        '4+': len([elem for elem in info['pathogenInfo']['pathogens_in_vacuole'] if elem > 4])\
-                    /vacNum if not vacNum == 0 else 0,
-    }
-    return {
-        'percent_infected': percentInf,
-        'vacuole_to_cell_ratio': vacCellRat,
-        'pathogen_load': patLoad,
-        'infection_levels': infectLevel,
-        'mean_pathogen_size': meanPatSize,
-        'vacuole_position': vacPosition,
-        'percent_replicating_pathogens': percentRep,
-        'replication_distribution': repDist
-    }
-
-# The function below takes in a path, and simply obtains the file names in that path.
-# This is for reusability - other functions can use this function without having to write
-# a try-except block for each of them.
-# Arguments:
-#   - path (string): The path to a directory
-# Returns:
-#   - fileNames (list<string>): List of file names
-def obtain_file_names(path):
-    pathNames = []
-    try:
-        for fileName in os.listdir(path):
-            # Append fileName onto path to form the path to the image
-            imagePath = path + f'/{fileName}'
-            imagePath = os.path.abspath(imagePath)
-            # Convert backwards slash to forward slash
-            imagePath = '/'.join(imagePath.split('\\'))
-            pathNames.append(imagePath)
-    except:
-        file_exception_checking(path)
-    return pathNames
-
-# The function is simply a function to check if there exists a path to a user-defined directory.
-# If there is not one, then it will print an error.
-# arguments:
-#   - path (string): The path to the directory
-# returns:
-#   - None. Simply prints/outputs an error.
-def file_exception_checking(path):
-    if not (os.path.exists(path)):
-        print('The directory path does not exist.')
 
 if __name__ == '__main__':
     image_analysis("../Images/Nuclei", "../Images/Pathogen", "../Images/Cell", 10000, './temp')

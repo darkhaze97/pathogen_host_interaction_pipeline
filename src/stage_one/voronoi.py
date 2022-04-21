@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # Resources used:
 #   https://stackoverflow.com/questions/57385472/how-to-set-a-fixed-outer-boundary-to-voronoi-tessellations
 def voronoi_seg(centroidList, shape):
-    print('Shape: ', shape)
+    # print('Shape: ', shape)
     
     # First, fix the centroidList. Note that numpy orders their indexing
     # by row first, followed by column. Even though the indexing starts
@@ -15,7 +15,7 @@ def voronoi_seg(centroidList, shape):
     for centroid in centroidList:
         centroid[0], centroid[1] = centroid[1], centroid[0]
     
-    print(shape[0], shape[1])
+    # print(shape[0], shape[1])
     
     inputPoints = np.array(centroidList)
     vor = Voronoi(inputPoints)
@@ -43,7 +43,7 @@ def voronoi_seg(centroidList, shape):
         ridges.setdefault(p1, []).append((p2, v1, v2))
         ridges.setdefault(p2, []).append((p1, v1, v2))
     
-    print(ridges)
+    # print(ridges)
     
     # mappedRidgeVertices is a list that contains tuples of vertices, each representing a ridge.
     mappedRidgeVertices = []
@@ -65,14 +65,14 @@ def voronoi_seg(centroidList, shape):
                 edgeVertex = determine_edge_vertex(p1, p2, v1, v2, shape, vor)
                 
     
-    print(vor.points)
-    print(vor.vertices)
-    print(vor.ridge_points)
-    print(vor.ridge_vertices)
-    print(vor.regions)
-    print(vor.point_region)
-    voronoi_plot_2d(vor)
-    plt.show()
+    # print(vor.points)
+    # print(vor.vertices)
+    # print(vor.ridge_points)
+    # print(vor.ridge_vertices)
+    # print(vor.regions)
+    # print(vor.point_region)
+    # voronoi_plot_2d(vor)
+    # plt.show()
 
 # The function below should return a valid vertex.
 def determine_edge_vertex(p1, p2, v1, v2, shape, vor):

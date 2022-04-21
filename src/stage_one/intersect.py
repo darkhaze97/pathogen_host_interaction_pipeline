@@ -78,18 +78,10 @@ def get_intersection_information(pathogenImages, cellImages, nucleiImages, saveP
         cellProps = measure.regionprops(cellImages[i][0], intensity_image=intracellularPathogens[i])
         # Scan through each prop generated, and filter through the intensity_mean.
         for cell in cellProps:
-            # Apply a regionprops to each cell separately again, and use the original Cell image
-            # as an intensity image to find out if the current label is a cell label.
+            # Obtain the bound of the cell. This will be used later to extract pixels from an
+            # image.
             bound = cell.bbox
-            # Convert cell['image'] into an integer array.
-            cellImg = (cell['image'] == True).astype(int)
-            assertCell = measure.regionprops(cellImg,
-                                             intensity_image=cellImages[i][3][bound[0]:bound[2], bound[1]:bound[3]])
-            # If statement below only considers 'true' cell labels. E.g. when we combined
-            # the nuclei and the cell labels, if there were any nuclei labels by themselves
-            # they will not be considered.
-            if (assertCell[0]['intensity_mean'] == 0):
-                continue
+
             if (cell['intensity_mean'] == 0):
                 extract_cell_info(cellInfo, i, cell, 0)
             else:
@@ -111,6 +103,7 @@ def get_intersection_information(pathogenImages, cellImages, nucleiImages, saveP
                 # intensity_mean. (<100% indicates the pathogen is not within the cell.
                 # This can occur if the pathogen is in another cell, but is in the same bounding
                 # box.)
+                
                 pathogenProps = list(filter(filter_one_hundred_mean_intensity, pathogenProps))
                 # Create the cell info, by using the length of pathogenProps as the number
                 # of infected cells within this cell.
