@@ -133,21 +133,8 @@ def label_images_otsu(path, nucleiImages, threshold):
         alteredImg = segment_cleanup(alteredImg, greyImage, not nucleiImages == None)
 
         # Place unique labels on segmented areas
-        labelImg = measure.label(alteredImg, connectivity=greyImage.ndim)
-        
-        # Now, we perform more processing if we are currently analysing cell images.
-        if (not nucleiImages == None):
-            origCellImg = np.copy(alteredImg)
-            alteredImg = combine_cell_nuclei_label(alteredImg, nucleiImages[i][0])
-            labelImg = measure.label(alteredImg, connectivity=greyImage.ndim)
-            
-            # A new labelled image also has to be created, as the nuclei labels are being removed.
-            dim = np.shape(labelImg)
-            newLabelImg = np.zeros((dim[0], dim[1]))
-            
-            process_cell(labelImg, origCellImg, nucleiImages[i][0], newLabelImg)
-            
-            labelImg = measure.label(newLabelImg)
+        labelImg = measure.label(alteredImg, connectivity=greyImage.ndim) if (nucleiImages == None) \
+                   else process_cell(alteredImg, nucleiImages[i][0], greyImage)
             
         # plt.imshow(labelImg)
         # plt.show()
@@ -209,7 +196,22 @@ def apply_clahe(img):
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     return clahe.apply(img)
 
-def process_cell(labelImg, origCellImg, nucleiImage, newLabelImg):
+# ============================ TODO =============================
+def process_cell(alteredImg, nucleiImage, greyImage):
+    origCellImg = np.copy(alteredImg)
+    alteredImg = combine_cell_nuclei_label(alteredImg, nucleiImage)
+    alteredImg = measure.label(alteredImg, connectivity=greyImage.ndim)
+    
+    # A new labelled image also has to be created, as the nuclei labels are being removed.
+    dim = np.shape(alteredImg)
+    newLabelImg = np.zeros((dim[0], dim[1]))
+    
+    correct_segmentation(alteredImg, origCellImg, nucleiImage, newLabelImg)
+    
+    return measure.label(newLabelImg)
+
+# ============================ TODO ===============================
+def correct_segmentation(labelImg, origCellImg, nucleiImage, newLabelImg):
     # First, we need to remove any nuclei only labels. Perform a regionprops
     # to obtain information about each cell label.
     cellProps = measure.regionprops(labelImg)
