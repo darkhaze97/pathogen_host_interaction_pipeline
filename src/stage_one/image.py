@@ -144,7 +144,15 @@ def label_images_otsu(path, nucleiImages, threshold):
         images.append((labelImg, greyImage, imagePath))
     return images
 
-# ================= TODO =========================
+# The function below cleans up the segmentation. It removes all labels that are on the
+# border, removes labelled regions that are too small, and removes small holes
+# within a label. 
+# Arguments:
+#   - alteredImg (numpy array): The image to clean up
+#   - greyImage (numpy array): An image to help form the connectivity of the labelled image.
+#   - isCell (boolean): Boolean for whether the image is of a cell or not.
+# Returns:
+#   - alteredImg (numpy array): The cleaned up image.
 def segment_cleanup(alteredImg, greyImage, isCell):
     # Remove elements on the border. 
     alteredImg = clear_border(alteredImg)
@@ -196,7 +204,16 @@ def apply_clahe(img):
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     return clahe.apply(img)
 
-# ============================ TODO =============================
+# This function is to process cell images. It performs pre-processing steps, to allow
+# correct_segmentation to be called. It will return the new cell image that has been
+# processed. For more information, read the information for correct_segmentation.
+# Arguments:
+#   - alteredImg (numpy array): The cell image.
+#   - nucleiImage (numpy array): Used to combine the cell and nuclei labels, to fill in 
+#                                holes in the cell labels.
+#   - greyImage (numpy array): An image to help form the connectivity when labelling alteredImg
+# Returns:
+#   - A labelled image of the edited cell image.
 def process_cell(alteredImg, nucleiImage, greyImage):
     origCellImg = np.copy(alteredImg)
     alteredImg = combine_cell_nuclei_label(alteredImg, nucleiImage)
@@ -210,7 +227,18 @@ def process_cell(alteredImg, nucleiImage, greyImage):
     
     return measure.label(newLabelImg)
 
-# ============================ TODO ===============================
+# This function performs the brunt of the cell image correction. It removes nuclei only labels,
+# which are a by-product of combining cell and nuclei labels. In addition, it separates
+# cells that are touching each other, by calling functions to perform voronoi segmentation.
+# Arguments:
+#   - labelImg (numpy array): The cell image that has combined with nuclei.
+#   - origCellImg (numpy array): The original cell image that has not combined with nucleiImages yet.
+#                                This will be used to remove nuclei only labels.
+#   - nucleiImage (numpy array): The nuclei images. This will be used to remove nuclei only
+#                                labels.
+#   - newLabelImg (numpy array): This will contain the edited cell image, and will be the 'return'
+# Returns:
+#   - None, however, newLabelImg will be the return by reference.
 def correct_segmentation(labelImg, origCellImg, nucleiImage, newLabelImg):
     # First, we need to remove any nuclei only labels. Perform a regionprops
     # to obtain information about each cell label.

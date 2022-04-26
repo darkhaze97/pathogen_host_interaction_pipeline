@@ -1,3 +1,4 @@
+import collections
 import math
 import os
 import matplotlib.pyplot as plt
@@ -22,50 +23,13 @@ from helper import filter_one_hundred_mean_intensity
 #     cellInfo['vacuole_number'][2] are referring to the same cell.
 def get_intersection_information(pathogenImages, cellImages, nucleiImages, savePath):
     # Relabel all labels to 0 (background) or 1 in both the cell and pathogen images.
-    labelledPathogen = []
-    labelledCell = []
-    for pathogen in pathogenImages:
-        newLabelPathogen = (pathogen[0] > 0).astype(int)
-        labelledPathogen.append(newLabelPathogen)
-    for cell in cellImages:
-        newLabelCell = (cell[0] > 0).astype(int)
-        labelledCell.append(newLabelCell)
+    labelledCell = [(cell[0] > 0).astype(int) for cell in cellImages]
+    labelledPathogen = [(path[0] > 0).astype(int) for path in pathogenImages]
     
-    # Join the labels for each corresponding index. I.e. join labelledPathogen[1]
-    # with labelledCell[1]. Then, obtain the intracellular pathogens only. The intracellular
-    # pathogens will be labelled 3, since it overlaps with cell labels.
-    intracellularPathogens = []
-    for i in range(0, len(labelledPathogen)):
-        joinedLabels = segmentation.join_segmentations(labelledPathogen[i], labelledCell[i])
-        
-        filtered = (joinedLabels == 3).astype(int)
-        intracellularPathogens.append(filtered)
+    intracellularPathogens = obtain_intracellular_pathogens(labelledPathogen, labelledCell, pathogenImages)
 
-    # Join intracellular pathogens with the original pathogen labels, and then find regions with
-    # mean_intensity == 1.0 (i.e. 100% overlap). Record the labels that have mean intensity
-    # 1.0 in an array, and filter these into a new image.
-    for i in range(0, len(labelledCell)):
-        # We use regionprops_table instead of regionprops, to reduce the number of properties
-        # to analyse and make a small performance boost.
-        props = measure.regionprops_table(pathogenImages[i][0], intensity_image=intracellularPathogens[i],
-                                          properties=['label', 'intensity_mean'])
-        fullyIntracellular = []
-        for j in range(0, len(props['label'])):
-            if (props['intensity_mean'][j] == 1.0):
-                fullyIntracellular.append(props['label'][j])
-        # Now, filter out the fully intracellular labels from pathogenImages[i][0], and
-        # then convert each image to having only two labels; the background (0), and
-        # pathogen labels (1)
-        truthTable = (np.in1d(pathogenImages[i][0], fullyIntracellular)).reshape(
-                        len(pathogenImages[i][0]),
-                        len(pathogenImages[i][0][0])
-                     )
-        intracellularPathogens[i] = (truthTable == True).astype(int)
-
-    pathogenInfo = {'bounding_box': [], 'area': [], 'image': [], 'perimeter': [],
-                    'diameter': [], 'circularity': [], 'dist_nuclear_centroid': []}
-    cellInfo = {'bounding_box': [], 'area': [], 'image': [], 'vacuole_number': [], 'perimeter': [],
-                'diameter': [], 'circularity': []}
+    pathogenInfo = collections.defaultdict(lambda: [])
+    cellInfo = collections.defaultdict(lambda: [])
 
     # Use regionprops_table on the cell labels by supplying the fully intracellular pathogens as an
     # intensity image. Then apply regionprops_table to find the intensity_mean, where 
@@ -74,7 +38,7 @@ def get_intersection_information(pathogenImages, cellImages, nucleiImages, saveP
     # dist_nuclear_centroid for the pathogens.
     # Scan through every intracellular pathogen image, and apply regionprops_table to each
     # corresponding image.
-    for i in range(0, len(intracellularPathogens)):
+    for i in range(len(intracellularPathogens)):
         cellProps = measure.regionprops(cellImages[i][0], intensity_image=intracellularPathogens[i])
         # Scan through each prop generated, and filter through the intensity_mean.
         for cell in cellProps:
@@ -82,6 +46,7 @@ def get_intersection_information(pathogenImages, cellImages, nucleiImages, saveP
             # image.
             bound = cell.bbox
 
+            # If intensity_mean == 0, this means that no pathogen is inside this cell.
             if (cell['intensity_mean'] == 0):
                 extract_cell_info(cellInfo, i, cell, 0)
             else:
@@ -103,7 +68,6 @@ def get_intersection_information(pathogenImages, cellImages, nucleiImages, saveP
                 # intensity_mean. (<100% indicates the pathogen is not within the cell.
                 # This can occur if the pathogen is in another cell, but is in the same bounding
                 # box.)
-                
                 pathogenProps = list(filter(filter_one_hundred_mean_intensity, pathogenProps))
                 # Create the cell info, by using the length of pathogenProps as the number
                 # of infected cells within this cell.
@@ -117,121 +81,65 @@ def get_intersection_information(pathogenImages, cellImages, nucleiImages, saveP
 
     if (os.path.exists(savePath + '.csv')):
         os.remove(savePath + '.csv')
-    
     # Run the decision tree to determine the number of pathogens in each parasitophorous
-    # vacuole.
+    # vacuole. We only run the decision tree if there are valid pathogens.
     prepare_decision_tree(pathogenInfo)
     
     return {'pathogenInfo': pathogenInfo, 'cellInfo': cellInfo}
 
-# The function below is to simply scan the immediate neighbours 
-# around a pixel (all 8 pixels around). If a pixel is from a different label,
-# then determine if it needs to be added to the neighbours list, and then repeat.
-# It is worst case O((p + 1)log(p + 1)). The reason why I implement binary search and
-# sort with this is because adding onto the neighbours list occurs rarely (only at the
-# first encounter of a different label), and the algorithm will mainly be performing
-# a binary search for these labels instead. Therefore, on average, this search algorithm
-# will be O(logp), rather than O(p) (when scanning through a list linearly).
+# This function obtains the pathogens that are completely intracellular in a cell. 
+# It joins pathogenImages with cellImages, and performs other processing steps to 
+# eventually obtain the image of fully intracellular pathogens.
 # Arguments:
-#   - labelImage: The labelledImage that we are analysing
-#   - row: The current row we have scanned to
-#   - column: The current column we have scanned to
-#   - label: The current label we are considering neighbours for.
-#   - neighbours: The list that contains the neighbours for the current label.
-def scan_neighbours(labelImage, row, column, label, neighbours):
-    # We will create variables that indicate whether or not we can scan one pixel
-    # to the left, one pixel to the right, one pixel above or one pixel below.
-    # This is to account for if the index is out of range (e.g. if column is 0,
-    # we should not be able to scan into column -1)
-    leftValid = True
-    rightValid = True
-    topValid = True
-    botValid = True
-    if (column == 0):
-        leftValid = False
-    if (column == len(labelImage) - 1):
-        rightValid = False
-    if (row == 0):
-        topValid = False
-    if (row == len(labelImage) - 1):
-        botValid = False
-    # If leftValid is True, then it means we can scan to the left pixels.
-    # Check one pixel left of labelImage[row][column]
-    if (leftValid):
-        left = labelImage[row][column - 1]
-        valid_neighbour_pixel_check(neighbours, label, left)
-    # Check one pixel top left.
-    if (leftValid and topValid):
-        topLeft = labelImage[row - 1][column - 1]
-        valid_neighbour_pixel_check(neighbours, label, topLeft)
-    # Check one pixel bottom left.
-    if (leftValid and botValid):
-        botLeft = labelImage[row + 1][column - 1]
-        valid_neighbour_pixel_check(neighbours, label, botLeft)
-    # Check one pixel top.
-    if (topValid):
-        top = labelImage[row - 1][column]
-        valid_neighbour_pixel_check(neighbours, label, top)
-    # Check one pixel bottom.
-    if (botValid):
-        bot = labelImage[row + 1][column]
-        valid_neighbour_pixel_check(neighbours, label, bot)
-    # Check one pixel right.
-    if (rightValid):
-        right = labelImage[row][column + 1]
-        valid_neighbour_pixel_check(neighbours, label, right)
-    # Check one pixel top right.
-    if (rightValid and topValid):
-        topRight = labelImage[row - 1][column + 1]
-        valid_neighbour_pixel_check(neighbours, label, topRight)
-    # Check one pixel bot right
-    if (rightValid and botValid):
-        botRight = labelImage[row + 1][column + 1]
-        valid_neighbour_pixel_check(neighbours, label, botRight)
-        
-# Below is to check if the neighbourLabel should be placed into the neighbours list.
-# The time complexity of this is O((p+1)log(p+1)) in the worst case (needing to append and sort)
-# and the best case is O(logp), which is simply a binary search only
-# Arguments:
-#   - neighbours: The list of neighbours for label
-#   - label: The label we are currently checking neighbours for.
-#   - neighbourLabel: A potential neighbourLabel to add to the neighbours list.
-def valid_neighbour_pixel_check(neighbours, label, neighbourLabel):
-    # Check that the neighbourLabel is not the same as the current label we are looking at,
-    # and that the neighbourLabel is not the background (0).
-    if (not neighbourLabel == label and not neighbourLabel == 0):
-        # If the pixel immediately to the left is not the current label
-        # we are looking at, and is not the background, check if this label
-        # has already been added to neighbours in O(logp) time (binary search). 
-        # If it has, then skip. If not, add to the neighbours list and sort in O(plogp) time.
-        if (not exists(neighbours, neighbourLabel, 0, len(neighbours) - 1)):
-            neighbours.append(neighbourLabel)
-            neighbours.sort()
-
-# Below is to perform a binary search for a value val in arr. This is therefore performed
-# in O(logn) time.
-# Arguments:
-#   - arr: The array
-#   - val: The value to check for.
-#   - first: The first index to check for
-#   - last: The last index to check for.
+#   - labelledPathogen (list<numpy array>): A list of the labelled images of the pathogens.
+#   - labelledCell (list<numpy array>): A list of the labelled images of the cells.
+#   - pathogenImages (list<(labelled images (list), images (list), imagePath (string)))>: A list
+#                                                 containing the original labelled pathogen images.
 # Returns:
-#   - True if the value exists in first - last. False if the value does not exist in first - last
-def exists(arr, val, first, last):
-    # Base cases
-    if (len(arr) == 0):
-        return False
-    if (first == last):
-        if (arr[first] == val):
-            return True
-        else:
-            return False
-    # Else, continue to base case.
-    mid = int((first + last)/2)
-    # Return true or false, based on the base cases.
-    return (exists(arr, val, first, mid) or exists(arr, val, mid + 1, last))
+#   - intracellularPathogens (list<numpy array>): A list of the labelled images of the fully
+#                                                 intracellular pathogens.
+def obtain_intracellular_pathogens(labelledPathogen, labelledCell, pathogenImages):
+    # Join the labels for each image in labelledPathogen and labelledCell. Then,
+    # obtain the intracellular pathogens only. The intracellular pathogens will be
+    # labelled 3, since it overlaps with the cell labels.
+    joinedLabels = [segmentation.join_segmentations(p, c) for p, c in zip(labelledPathogen, labelledCell)]
+    intracellularPathogens = [(j == 3).astype(int) for j in joinedLabels]
 
-# ===============TODO======================
+    # Now, we need to find the pathogens that are completely intracellular, and not
+    # slightly inside a cell whilst being slightly outside of the cell at the same time.
+    # For every single pathogenImage, use the corresponding intracellularPathogen image
+    # as an intensity image. Then, use the intensity to determine the pathogens
+    # that are completely intracellular.
+    pathPropAllImg = [measure.regionprops_table(pathIm[0], intensity_image=intraPath,
+                                          properties=['label', 'intensity_mean'])\
+                      for pathIm, intraPath in zip(pathogenImages, intracellularPathogens)]
+    # Scan through elements in pathPropAllImg, and for each element, obtain the labels that have
+    # an intensity_mean of 1.0. In this step, we have now obtained the labels of the pathogens
+    # that are completely intracellular.
+    fullyIntracellularLabels = [[pathLab for pathLab, pathInt in zip(pathPropImg['label'], pathPropImg['intensity_mean']) \
+                                   if (pathInt == 1.0)] for pathPropImg in pathPropAllImg]
+    
+    # Below is to filter out the fully intracellular pathogens from the original labelled
+    # image that we have.
+    fullyIntracellularAllImg = [(np.in1d(pathIm[0], fullyIntracellularLabel)).reshape(
+                                len(pathIm[0]),
+                                len(pathIm[0][0])
+                                )
+                                for pathIm, fullyIntracellularLabel in zip(pathogenImages, fullyIntracellularLabels)]
+    # Below simply changes fullyIntracellularAllImg to 0 (background) or 1 (a region)
+    intracellularPathogens = [(fullyIntracellularImg == True).astype(int) \
+                              for fullyIntracellularImg in fullyIntracellularAllImg]
+    return intracellularPathogens
+
+# This function measures the fluorescence of a pathogen. We run this information through
+# a decision tree, to help predict the number of pathogens in a vacuole.
+# Arguments:
+#   - pathogenInfo (dict): The pathogenInfo dictionary. We use it here to update it.
+#   - image (list<(labelled images (list), images (list), imagePath (string))>): This is used to 
+#                                      obtain the path to the image, for loading in imageJ.
+#   - bound (tuple): Tuple containing the bounding box of the pathogen.
+#   - savePath (string): The save file name for the csv that will be created from this measurement.
+#                        This file will be deleted after it is read.
 def measure_fluorescence(pathogenInfo, image, bound, savePath):
     # Measure the fluorescence readings, and prepare to add to the dictionary
     # that stores information about the entity.
@@ -254,7 +162,7 @@ def measure_fluorescence(pathogenInfo, image, bound, savePath):
         header = next(csvread)
         # Obtain the next row from the csv.
         row = next(csvread)
-        for i in range(0, len(header)):
+        for i in range(len(header)):
             if (header[i] == ' '):
                 continue
             if (header[i] not in pathogenInfo):
