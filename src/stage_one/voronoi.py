@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.spatial import Voronoi, voronoi_plot_2d
+from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
 import matplotlib.pyplot as plt
 
 
@@ -19,6 +19,7 @@ def voronoi_seg(centroidList, shape):
     
     inputPoints = np.array(centroidList)
     vor = Voronoi(inputPoints)
+    kdtree = cKDTree(inputPoints)
     
     # I move the vertex lists out so that it is easier to update the values.
     allVertices = vor.vertices
@@ -62,23 +63,69 @@ def voronoi_seg(centroidList, shape):
         for (p2, v1, v2) in ridges[p1]:
             if (v1 == -1 or v2 == -1):
                 # Add the return from the function to allVertices and ridgeVertices
-                edgeVertex = determine_edge_vertex(p1, p2, v1, v2, shape, vor)
+                # The reason why we pass max(v1, v2) in is because we want to use
+                # the defined vertex as a way to find the gradient of the ridge.
+                edgeVertex = determine_edge_vertex(p1, p2, max(v1, v2), shape, vor, kdtree)
                 
     
-    # print(vor.points)
-    # print(vor.vertices)
-    # print(vor.ridge_points)
-    # print(vor.ridge_vertices)
-    # print(vor.regions)
-    # print(vor.point_region)
-    # voronoi_plot_2d(vor)
-    # plt.show()
+    print(vor.points, centroidList)
+    print(vor.vertices)
+    print(vor.ridge_points)
+    print(vor.ridge_vertices)
+    print(vor.regions)
+    print(vor.point_region)
+    voronoi_plot_2d(vor)
+    plt.show()
 
 # The function below should return a valid vertex.
-def determine_edge_vertex(p1, p2, v1, v2, shape, vor):
+def determine_edge_vertex(p1, p2, vIndex, shape, vor, kdtree):
+    # First, make a point set with p1 and p2. This will be used to compare if the 
+    # nearest 2 neighbours are in fact p1 and p2.
+    pointSet = {tuple(p) for p in vor.points[[p1, p2]]}
     # Decide which edge the ridge collides with 
-    # (left [0], right [defined in shape[1] - 1], top [defined in shape[0] -1], 
+    # (left [0], right [defined by shape[1] - 1], top [defined by shape[0] -1], 
     # bottom [0])
-    # First, find the midpoint of the two points.
+    # First, find the midpoint of the two points. The reason why we find the midpoint is because
+    # we want to find a point on the ridge. p1 and p2 are equidistant from the ridge that spans
+    # between them.
     midpoint = vor.points[[p1, p2]].mean(axis=0)
-    # Find the gradient in vector form.
+    # Obtain the vertex represented by vIndex. This is a known ridge vertex in the ridge,
+    # and will be used to find a vector that spans this ridge.
+    vertex = vor.vertices[vIndex]
+    # Find the gradient vector. The gradient will be the line from the
+    # ridge vertex to the midpoint.
+    gradVec = midpoint - vertex
+    print("For the vertex: ", vertex, ", and the midpoint: ", midpoint, ", we have gradient: ", gradVec)
+    # There are 4 borders to check for intersection: x = 0, x = shape[0], y = 0, y = shape[1]
+    # And we have an equation like so: a * gradVec + vertex = <x, y>, where x or y is known, as they
+    # are the borders.
+    # First, fix x and solve for y when x = 0
+    epsilon = (-vertex[0])/gradVec[0]
+    y = gradVec[1] * epsilon + vertex[1]
+    # Check if y lies within our borders.
+    if (y > 0 and y < shape[1]):   
+        # Check if y is equidistant to p1 and p2.
+        dist, nearest2Neighbours = kdtree.query([0, y], k=2)
+        # If statement below checks if the computed 2 nearest neighbours
+        # matches p1 and p2.
+        if ({tuple(p) for p in vor.points[nearest2Neighbours]} == pointSet):
+            print([0,y])
+            return [0, y]
+    # Next, fix x and solve for y when x = shape[0] - 1
+    epsilon = (shape[0] - 1 - vertex[0])/gradVec[0]
+    y = gradVec[1] * epsilon + vertex[1]
+    # Check if y lies within our borders.
+    
+    
+    # Solve for all lambdas. Whichever border the line hits that is on
+    # the border of our rectangle may be the true vertex we have. We will have to test
+    # if this vertex is equidistant from p1 and p2. If it isn't then, find the other
+    # vertex. Check image1 of the summer research images. We will see that finding the midpoint
+    # of the two outer vertices leads to a midpoint which does not lie on the ridge.
+    # If we only considered the vector going from the vertex to the midpoint, then the
+    # second edge vertex for this ridge will not be correct. Therefore, we need to use
+    # a cKDTree. 
+    # https://stackoverflow.com/questions/17857021/finding-voronoi-regions-that-contain-a-list-of-arbitrary-coordinates
+    
+def solve_y():
+    print('Hi')
