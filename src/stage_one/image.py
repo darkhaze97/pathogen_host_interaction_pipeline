@@ -290,6 +290,7 @@ def correct_segmentation(labelImg, origCellImg, nucleiImage, newLabelImg):
         if (len(centroidList) == 2):
             print('')
         elif (len(centroidList) > 2):
+            # print(np.shape(cellImg))
             # plt.imshow(cellImg)
             # plt.show()
             voronoi_seg(centroidList, np.shape(cellImg))

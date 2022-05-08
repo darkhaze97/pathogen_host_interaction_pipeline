@@ -2,7 +2,8 @@ import numpy as np
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
 import matplotlib.pyplot as plt
 
-
+# The function below is to perform a voronoi segmentation.
+# ======================= TO DO WHEN FINISHED =======================
 # Resources used:
 #   https://stackoverflow.com/questions/57385472/how-to-set-a-fixed-outer-boundary-to-voronoi-tessellations
 def voronoi_seg(centroidList, shape):
@@ -19,6 +20,7 @@ def voronoi_seg(centroidList, shape):
     
     inputPoints = np.array(centroidList)
     vor = Voronoi(inputPoints)
+    # The kdtree will be used when finding the vertex of a voronoi region that is infinite.
     kdtree = cKDTree(inputPoints)
     
     # I move the vertex lists out so that it is easier to update the values.
@@ -77,8 +79,28 @@ def voronoi_seg(centroidList, shape):
     voronoi_plot_2d(vor)
     plt.show()
 
-# The function below should return a valid vertex.
+# This function returns a valid edge vertex, based on the voronoi segmentation.
+# Arguments:
+#   - p1 and p2: points which formed the voronoi ridge. Compared to the
+#                nearest 2 neighbours of the computed edge vertex. This is to help
+#                determine the correct edge vertex, since the edge vertex should
+#                be equidistant from the two points (property of voronoi ridges).
+#   - vIndex: The index of the known vertex in the voronoi ridge. This will be used to
+#             compute the gradient vector of the ridge, and then to find the
+#             edge vertex by finding points of intersection with the borders.
+#   - shape: Used to find the maximum x and maximum y values. These values are used to
+#            determine if the computed x and y values are within the borders.
+#   - vor: The voronoi segmentation diagram.
+#   - kdtree: A data structure to find the nearest neighbours.
+# Returns:
+#   - vertex [x, y]: The edge vertex. Should not return None, as the ridge vertex should always
+#                    intersect one valid border. (Valid == x and y values between 0 and maxX or maxY
+#                    inclusive, and is equidistant to p1 and p2, which are it's nearest neighbours).
+# Sources: # https://stackoverflow.com/questions/17857021/finding-voronoi-regions-that-contain-a-list-of-arbitrary-coordinates
 def determine_edge_vertex(p1, p2, vIndex, shape, vor, kdtree):
+    # Extract the maxX value and the maxY value.
+    maxX = shape[1] - 1
+    maxY = shape[0] - 1
     # First, make a point set with p1 and p2. This will be used to compare if the 
     # nearest 2 neighbours are in fact p1 and p2.
     pointSet = {tuple(p) for p in vor.points[[p1, p2]]}
@@ -96,36 +118,79 @@ def determine_edge_vertex(p1, p2, vIndex, shape, vor, kdtree):
     # ridge vertex to the midpoint.
     gradVec = midpoint - vertex
     print("For the vertex: ", vertex, ", and the midpoint: ", midpoint, ", we have gradient: ", gradVec)
-    # There are 4 borders to check for intersection: x = 0, x = shape[0], y = 0, y = shape[1]
+    # There are 4 borders to check for intersection: x = 0, x = shape[1], y = 0, y = shape[0]
     # And we have an equation like so: a * gradVec + vertex = <x, y>, where x or y is known, as they
-    # are the borders.
+    # are the borders, and a is any real number.
+
     # First, fix x and solve for y when x = 0
     epsilon = (-vertex[0])/gradVec[0]
     y = gradVec[1] * epsilon + vertex[1]
-    # Check if y lies within our borders.
-    if (y > 0 and y < shape[1]):   
-        # Check if y is equidistant to p1 and p2.
-        dist, nearest2Neighbours = kdtree.query([0, y], k=2)
-        # If statement below checks if the computed 2 nearest neighbours
-        # matches p1 and p2.
-        if ({tuple(p) for p in vor.points[nearest2Neighbours]} == pointSet):
-            print([0,y])
-            return [0, y]
-    # Next, fix x and solve for y when x = shape[0] - 1
-    epsilon = (shape[0] - 1 - vertex[0])/gradVec[0]
+    # Below checks if y lies within our borders. If it does, it will determine if the nearest
+    # neighbours match p1 and p2. If it does, return [0, y], else, continue.
+    ret = valid_neighbours(None, y, 0, kdtree, vor, pointSet) if valid_within_borders(y, maxY) else []
+    if (ret): return ret
+
+    # Next, fix x and solve for y when x = shape[1] - 1
+    epsilon = (maxX - vertex[0])/gradVec[0]
     y = gradVec[1] * epsilon + vertex[1]
-    # Check if y lies within our borders.
+    # Below checks if y lies within our borders. If it does, it will determine if the nearest
+    # neighbours match p1 and p2. If it does, return [maxX, y], else, continue.
+    ret = valid_neighbours(None, y, maxX, kdtree, vor, pointSet) if valid_within_borders(y, maxY) else []
+    if (ret): return ret
     
+    # Next, fix y and solve for x when y = 0
+    epsilon = (-vertex[1])/gradVec[1]
+    x = gradVec[0] * epsilon + vertex[0]
+    # Below checks if x lies within our borders. If it does, it will determine if the nearest
+    # neighbours match p1 and p2. If it does, return [x, 0], else, continue.
+    ret = valid_neighbours(x, None, 0, kdtree, vor, pointSet) if valid_within_borders(x, maxX) else []
+    if (ret): return ret
+
+    # Next, fix y and solve for x when y = shape[0] - 1
+    epsilon = (maxY - vertex[1])/gradVec[1]
+    x = gradVec[0] * epsilon + vertex[0]
+    # Below checks if x lies within our borders. If it does, it will determine if the nearest
+    # neighbours match p1 and p2. If it does, return [x, maxY], else, continue.
+    ret = valid_neighbours(x, None, maxY, kdtree, vor, pointSet) if valid_within_borders(x, maxX) else []
+    if (ret): return ret
+    print('How did we even end up here.')
     
-    # Solve for all lambdas. Whichever border the line hits that is on
-    # the border of our rectangle may be the true vertex we have. We will have to test
-    # if this vertex is equidistant from p1 and p2. If it isn't then, find the other
-    # vertex. Check image1 of the summer research images. We will see that finding the midpoint
-    # of the two outer vertices leads to a midpoint which does not lie on the ridge.
-    # If we only considered the vector going from the vertex to the midpoint, then the
-    # second edge vertex for this ridge will not be correct. Therefore, we need to use
-    # a cKDTree. 
-    # https://stackoverflow.com/questions/17857021/finding-voronoi-regions-that-contain-a-list-of-arbitrary-coordinates
-    
-def solve_y():
-    print('Hi')
+# This function simply computes if value >= 0 and value <= maxBorderValue. It makes sure
+# that the potential vertex is within the bounds of our image.
+# Arguments:
+#   - value: The x or y value to check
+#   - maxBorderValue: The maximum value of x or y, defined by shape[1] or shape[0] respectively.
+# Returns:
+#   - True or False depending on whether the conditional holds.
+def valid_within_borders(value, maxBorderValue):
+    return True if (value >= 0 and value <= maxBorderValue) else False
+
+# This function determines if the computed edge vertex's nearest neighbours are p1 and p2.
+# We use the property that any point on a voronoi ridge is equidistant to the two points
+# that form the ridge. 
+# Arguments:
+#   - x: The computed x value of the point. May be None if we are analysing the computed
+#        y value instead.
+#   - y: The computed y value of the point. May be None if we are analysing the computed
+#        x value instead.
+#   - fixedBorder: The border that will be fixed. This can either be 0, maxX (if we are
+#                  fixing x value of the computed edge vertex) or maxY (if we are fixing y
+#                  y value of the computed edge vertex)
+#   - kdtree: A data structure used to find the nearest points.
+#   - vor: The voronoi graph
+#   - pointSet: {(p1), (p2)}, used to determine if the neighbours are matching p1 and p2.
+# returns
+#   - []: If the neighbours do not match.
+#   OR vertex: the edge vertex that satisfies all conditions (is within the borders, and the
+#              nearest neighbours are p1 and p2).
+def valid_neighbours(x, y, fixedBorder, kdtree, vor, pointSet):
+    vertex = [x, fixedBorder] if x else [fixedBorder, y]
+    # Check if [x, fixedBorder] or [fixedBorder, y] is equidistant to p1 and p2.
+    dist, nearest2Neighbours = kdtree.query(vertex, k=2)
+    # If statement below checks if the computed 2 nearest neighbours
+    # matches p1 and p2.
+    if ({tuple(p) for p in vor.points[nearest2Neighbours]} == pointSet):
+        print(f'Intersect with y = {fixedBorder}: ', vertex) if x else \
+        print(f'Intersect with x = {fixedBorder}: ', vertex)
+        return vertex
+    return []
