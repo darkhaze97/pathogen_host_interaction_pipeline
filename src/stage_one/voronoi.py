@@ -1,12 +1,13 @@
 import numpy as np
 from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
+from skimage import draw, measure
 import matplotlib.pyplot as plt
 
 # The function below is to perform a voronoi segmentation.
 # ======================= TO DO WHEN FINISHED =======================
 # Resources used:
 #   https://stackoverflow.com/questions/57385472/how-to-set-a-fixed-outer-boundary-to-voronoi-tessellations
-def voronoi_seg(centroidList, shape):
+def voronoi_seg(centroidList, cellImg):
     # print('Shape: ', shape)
     
     # First, fix the centroidList. Note that numpy orders their indexing
@@ -49,35 +50,53 @@ def voronoi_seg(centroidList, shape):
     # print(ridges)
     
     # mappedRidgeVertices is a list that contains tuples of vertices, each representing a ridge.
-    mappedRidgeVertices = []
-    for p1, region in enumerate(vor.point_region):
-        # Obtain the ridge vertices around the region.
-        vertices = vor.regions[region]
-        
-        if all(v >= 0 for v in vertices):
-            # This region is finite. We need to simply obtain the vertices.
-            continue
-        
-        # We have an infinite region. First, scan through the (p2, v1, v2) of p1.
-        # Once we encounter a v1 or v2 == -1, then that ridge is infinite.
-        # The midpoint of p1, p2 is a point on the ridge. The gradient of the ridge
-        # will be found, and the intersection point will be computed from this.
+    mappedRidgeVertices = find_finite_ridge_endpoints(vor, ridges, cellImg, kdtree)
+    print(mappedRidgeVertices)
+    # print(vor.points, centroidList)
+    # print(vor.vertices)
+    # print(vor.ridge_points)
+    # print(vor.ridge_vertices)
+    # print(vor.regions)
+    # print(vor.point_region)
+    voronoi_plot_2d(vor)
+    plt.show()
+    separationImg = np.ones(cellImg.shape)
+    for v1, v2 in mappedRidgeVertices:
+        rr, cc, val = draw.line_aa(int(v1[1]), int(v1[0]), int(v2[1]), int(v2[0]))
+        separationImg[rr, cc] = 0
+        cellImg[rr, cc] = -1
+    separationImg = measure.label(separationImg)
+    return np.where(cellImg == 0, cellImg, cellImg + separationImg)
+
+# The function below finds the endpoints for infinite ridges. It returns the set of vertices that
+# form the voronoi segmentation.
+# Arguments:
+#   - vor: The voronoi segmentation diagram
+#   - ridges: The set of ridges surrounding a point
+#   - cellImg: The cell image
+#   - kdtree: A data structure used to find the nearest neighbours of a vertex.
+# Returns:
+#   - The list of ridge points, including the vertices that were computed from 
+#     infinite ridges.
+def find_finite_ridge_endpoints(vor, ridges, cellImg, kdtree):
+    # mappedRidgeVertices is a list that contains tuples of vertices, each representing a ridge.
+    mappedRidgeVertices = set()
+    for p1 in range(len(vor.point_region)):
+        # Scan through every ridge for p1
         for (p2, v1, v2) in ridges[p1]:
             if (v1 == -1 or v2 == -1):
+                # If we enter here, then we have an infinite ridge.
+                # The midpoint of p1, p2 is a point on the ridge. The gradient of the ridge
+                # will be found, and the intersection point with the borders will be 
+                # computed from this.
                 # Add the return from the function to allVertices and ridgeVertices
                 # The reason why we pass max(v1, v2) in is because we want to use
                 # the defined vertex as a way to find the gradient of the ridge.
-                edgeVertex = determine_edge_vertex(p1, p2, max(v1, v2), shape, vor, kdtree)
-                
-    
-    print(vor.points, centroidList)
-    print(vor.vertices)
-    print(vor.ridge_points)
-    print(vor.ridge_vertices)
-    print(vor.regions)
-    print(vor.point_region)
-    voronoi_plot_2d(vor)
-    plt.show()
+                edgeVertex = determine_edge_vertex(p1, p2, max(v1, v2), np.shape(cellImg), vor, kdtree)
+                mappedRidgeVertices.add((tuple(vor.vertices[max(v1, v2)]), edgeVertex))
+            else:
+                mappedRidgeVertices.add(tuple([tuple(v) for v in vor.vertices[[v1, v2]]]))
+    return mappedRidgeVertices
 
 # This function returns a valid edge vertex, based on the voronoi segmentation.
 # Arguments:
@@ -192,5 +211,5 @@ def valid_neighbours(x, y, fixedBorder, kdtree, vor, pointSet):
     if ({tuple(p) for p in vor.points[nearest2Neighbours]} == pointSet):
         print(f'Intersect with y = {fixedBorder}: ', vertex) if x else \
         print(f'Intersect with x = {fixedBorder}: ', vertex)
-        return vertex
+        return tuple(vertex)
     return []

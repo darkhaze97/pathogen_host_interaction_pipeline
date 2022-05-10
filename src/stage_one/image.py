@@ -290,11 +290,11 @@ def correct_segmentation(labelImg, origCellImg, nucleiImage, newLabelImg):
         if (len(centroidList) == 2):
             print('')
         elif (len(centroidList) > 2):
-            # print(np.shape(cellImg))
-            # plt.imshow(cellImg)
-            # plt.show()
-            voronoi_seg(centroidList, np.shape(cellImg))
-        
+            segmentedImg = voronoi_seg(centroidList, cellImg)
+            plt.imshow(segmentedImg)
+            plt.show()
+            correct_voronoi(segmentedImg, nucleiBox)
+                
         # Add the label to the new labelled image.
         boundBox = newLabelImg[bound[0]:bound[2], bound[1]:bound[3]]
         # If a specific pixel in the newLabelImg is of label 0, we can add the cell label
@@ -311,6 +311,43 @@ def correct_segmentation(labelImg, origCellImg, nucleiImage, newLabelImg):
         # ON THE CENTROIDS. OVERLAP REGIONS, AND THE SECTIONS OF THE CELLS IN THE DIFF
         # REGIONS CORRESPOND TO DIFF CELLS. NOTE THAT THIS SHOULD NOT RUN ON A CELL
         # WITH ONE NUCLEUS.
+
+def correct_voronoi(segmentedImg, nucleiBox):
+    # Then, if there are regions with the same label that are not adjacent,
+    # try to find the region it was originally connected to.
+    # First, distinguish the regions that should not be part of the same label
+    # i.e. labels that are not connected to the nucleus.
+    # Then, connect these regions to any other voronoi region, by obtaining
+    # their regions in a numpy array. Also collect the label '-1', as this
+    # is the voronoi ridge separating the regions.
+    # Then set all of these regions to the same label, and use measure.label
+    # once again. If the number of resulting regions is 1, this indicates
+    # that the regions are connecting.
+    
+    # Now, correct the voronoi segmentation. There will be some labels that
+    # have regions that are not connected spatially. Therefore, the correction
+    # will attempt to find the 'correct' connections for these regions.
+    
+    # First, obtain the regions that are not meant to be in this voronoi region.
+    # i.e. regions that are not connected to the nuclei.
+    # First, for each voronoi region, create an intensity image. Then, the
+    # corresponding nucleus for this voronoi region was obtained.
+    
+    
+    # Obtain nuclei that are completely within a cell... Obtain the nucleus with the
+    # highest intensity.
+    #   - Obtain the intensity image of segmentedImg
+    # Then obtain the regions that do not include this nuclus
+    #   - Done by: Removing the region that contains this nuclei (> 0 intensity)
+    vorRegions = measure.regionprops(segmentedImg)
+    for r in vorRegions:
+        intensityImage = (segmentedImg == r['label']).astype(int)
+        nucleiProps = measure.regionprops(nucleiBox,
+                                  intensity_image=intensityImage
+                                 )
+        for n in nucleiProps:
+            print(n['intensity_mean'])
+        
 
 if __name__ == '__main__':
     image_analysis("../Images/Nuclei", "../Images/Pathogen", "../Images/Cell", 10000, './temp')
