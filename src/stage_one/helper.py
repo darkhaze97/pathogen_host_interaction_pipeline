@@ -12,6 +12,18 @@ def filter_one_hundred_mean_intensity(data):
     if (data['intensity_mean'] == 1):
         return True
     return False
+
+# The function below is similar to the filter_one_hundred_mean_intensity function. This
+# function returns the labels with a mean intensity of 0.
+# Arguments:
+#   - data (list of RegionProperties)
+# Returns:
+#   - True or False, based on whether the condition: data['intensity_mean'] == 0
+#     holds.
+def filter_zero_mean_intensity(data):
+    if (data['intensity_mean'] == 0):
+        return True
+    return False
     
 # The function is simply a function to check if there exists a path to a user-defined directory.
 # If there is not one, then it will print an error.

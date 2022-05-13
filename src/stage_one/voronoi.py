@@ -60,13 +60,15 @@ def voronoi_seg(centroidList, cellImg):
     # print(vor.point_region)
     voronoi_plot_2d(vor)
     plt.show()
+    # Below is to help draw lines on the cell image, to perform the voronoi segmentation.
     separationImg = np.ones(cellImg.shape)
+    cellImgCopy = np.copy(cellImg)
     for v1, v2 in mappedRidgeVertices:
         rr, cc, val = draw.line_aa(int(v1[1]), int(v1[0]), int(v2[1]), int(v2[0]))
         separationImg[rr, cc] = 0
-        cellImg[rr, cc] = -1
+        cellImgCopy[rr, cc] = -1
     separationImg = measure.label(separationImg)
-    return np.where(cellImg == 0, cellImg, cellImg + separationImg)
+    return np.where(cellImgCopy == 0, cellImgCopy, cellImgCopy + separationImg)
 
 # The function below finds the endpoints for infinite ridges. It returns the set of vertices that
 # form the voronoi segmentation.
