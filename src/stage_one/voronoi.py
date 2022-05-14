@@ -62,13 +62,28 @@ def voronoi_seg(centroidList, cellImg):
     plt.show()
     # Below is to help draw lines on the cell image, to perform the voronoi segmentation.
     separationImg = np.ones(cellImg.shape)
-    cellImgCopy = np.copy(cellImg)
+    lineList = []
     for v1, v2 in mappedRidgeVertices:
         rr, cc, val = draw.line_aa(int(v1[1]), int(v1[0]), int(v2[1]), int(v2[0]))
         separationImg[rr, cc] = 0
-        cellImgCopy[rr, cc] = -1
+        lineList.append((rr, cc))
     separationImg = measure.label(separationImg)
-    return np.where(cellImgCopy == 0, cellImgCopy, cellImgCopy + separationImg)
+
+    # For each (rr, cc) pair in lineList, find the midpoint pixel, and obtain
+    # the nearest centroid neighbour to this line. Then set the line defined by rr, cc
+    # to the label of the centroid pixel.
+    for rr, cc in lineList:
+        # I reverse the order of the x and y, since I will be passing the midpoint into
+        # a kdtree, which uses (col, row).
+        midpoint = (int((cc[-1] + cc[0])/2), int((rr[-1] + rr[0])/2))
+        # Find nearest neighbour with kdtree, and obtain the centroid pixel by indexing
+        # with vor.points. Then assign the line to the label of the centroid pixel.
+        dist, nearestNeighbour = kdtree.query(midpoint)
+        # Below obtains the pixel coordinates of the centroid. It converts
+        # floats into ints.
+        nearestCentroid = [int(p) for p in reversed(vor.points[nearestNeighbour])]
+        separationImg[rr, cc] = separationImg[nearestCentroid[0], nearestCentroid[1]]
+    return np.where(cellImg == 0, cellImg, cellImg + separationImg)
 
 # The function below finds the endpoints for infinite ridges. It returns the set of vertices that
 # form the voronoi segmentation.

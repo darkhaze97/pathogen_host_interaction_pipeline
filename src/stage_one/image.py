@@ -337,11 +337,7 @@ def correct_voronoi(segmentedImg, nucleiBox, cellImg):
     # Then obtain the regions that do not include this nuclus
     #   - Done by: Removing the region that contains this nuclei (> 0 intensity)
     newImg = np.zeros(segmentedImg.shape)
-    # Extract parts of the voronoi ridges that overlap with the cells. This will be used
-    # later to rejoin labels from different voronoi regions.
-    vorRidgeOverlap = measure.label(np.where(segmentedImg == -1, cellImg, 0))
-    # Assign each ridge in the segmentedImg with the label of an adjacent region.
-    plt.imshow(vorRidgeOverlap)
+    plt.imshow(segmentedImg)
     plt.show()
     vorRegions = measure.regionprops(segmentedImg)
     for r in vorRegions:
@@ -378,25 +374,24 @@ def correct_voronoi(segmentedImg, nucleiBox, cellImg):
         cellProps = measure.regionprops(rLabel, intensity_image=intensityImage)
         cellProps = list(filter(filter_zero_mean_intensity, cellProps))
         
-        # Now, connect each of cellProps to a different labelled region, and
-        # include the -1 label (voronoi ridges).
-        # First, obtain the -1 regions that overlap with the original cell image.
-        # Then label each of these -1 regions again. (DONE)
-        # Then, insert the two labelled regions into the image with size
-        # nucleiBox.shape or segmentedImg.shape, and attempt to add
-        # each labelled -1 region to the image, and label. If the label results in
-        # one single region, then the region has been reformed. Label the region with
-        # the label of the other region in the other voronoi region in segmentedImg.
+        for c in cellProps:
+            cool = np.zeros(segmentedImg.shape)
+            cool[c.bbox[0]:c.bbox[2], c.bbox[1]:c.bbox[3]] = c.image
+            plt.imshow(cool)
+            plt.show()
+            
+        # Now connect each of cellProps to a different labelled region in a different image.
+        # Then, label the image. Label this region, and record the number of regions before
+        # adding the labelled region. Once the labelled region is added,
+        # do another labelling, and if the number of regions remains constant,
+        # then the labelled region is connected correctly. (Note that I may need to change
+        # the label of the labelled region when I add it (to the label that we are adding to),
+        # as measure.label may treat them differently.)
+        # Then, simply take segmentedImg, and then copy the label over from one region
+        # to the current one that we are considering (need to relabel for the for loop).
+        # Make an overarching while loop then, for when segmentedImg is updated.
         
-        
-        # Simply 'remove' this section of the voronoi ridge from segmentedImg, by filling in
-        # where the ridge was before. To do this, simply take the connected regions, and 
-        # colour over the section of the ridge between these connected regions (maybe
-        # use something like np.where. This is so that we don't remove the entire ridge, in
-        # case the ridge also separates two cells)
-        # Also remove this section of the ridge from vorRidgeOverlap, and 
-        # use measure.label the sections of ridges again.
-        # Then after all has been completed, relabel the entire segmentedImg
+
         
         
         
