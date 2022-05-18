@@ -10,23 +10,8 @@ from frontend import visualize
 # from image import image_analysis
 
 from stage_one import image_analysis
-# class SelectPath(ed.Component):
-#     def __init__(self):
-#         super().__init__()
-#     def render(self):
-#         form_data = ed.StateManager({
-#             'Select the nuclei image folder.': pathlib.Path(os.getcwd()),
-#             'Select the pathogen image folder.': pathlib.Path(os.getcwd()),
-#             'cellPath': pathlib.Path(os.getcwd())
-#         })
-#         return View(layout='row')(
-#             Label('Select the nuclei image folder.'),
-#             Form(form_data, config=CheckBox),
-#             Button(title='Confirm', onclick=)
-#         )
 
 def main():
-    # ed.App(SelectPath()).start()
     nucleiPath = ''
     pathogenPath = ''
     cellPath = ''
@@ -155,6 +140,7 @@ def main():
     savePath = values['#savepath'] + '/' + values['#filename']
     # First, create the pickle file. This is to use with visualize.py, so that
     # the user can see the images again in the GUI.
+    print(info)
     with open(savePath + '.pickle', 'wb') as f:
         pickle.dump(info, f)
 

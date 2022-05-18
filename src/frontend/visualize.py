@@ -1,6 +1,7 @@
 
 import sys
 import PySimpleGUI as sg
+from dash import Dash, html
 from PySimpleGUI import Text, Image, Window, Column, Button, WIN_CLOSED
 import cv2
 import pickle
@@ -34,6 +35,13 @@ statPrinter = {
 }
 
 def visualize(info):
+    app = Dash(__name__)
+    
+    app.layout = html.Div(
+        children='Bye! Thre!'
+    )
+    
+    app.run_server(debug=True)
     # root = tk.Tk()
     # canv = tk.Canvas(root, width=1048, height=1048, bg='white')
     # canv.grid(row=2, column=3)
@@ -117,58 +125,58 @@ def visualize(info):
     #         selectSpecificCol.update(buttonList)
     #         window.close()
     
-    pathogenColumn = [
-        [
-            Text('Pathogen information')
-        ]
-    ]
+    # pathogenColumn = [
+    #     [
+    #         Text('Pathogen information')
+    #     ]
+    # ]
     
-    for i in range(0, len(info['pathogenInfo']['area'])):
-        pathogenColumn.append([Text(form_pathogen_info(info['pathogenInfo'],i)),
-                               Image(reform_cropped_image_from_array(info['pathogenImages'][info['pathogenInfo']['image'][i]][1],
-                                                                     info['pathogenInfo']['bounding_box'][i]),
-                                     size = (200, 200)
-                               )])
+    # for i in range(0, len(info['pathogenInfo']['area'])):
+    #     pathogenColumn.append([Text(form_pathogen_info(info['pathogenInfo'],i)),
+    #                            Image(reform_cropped_image_from_array(info['pathogenImages'][info['pathogenInfo']['image'][i]][1],
+    #                                                                  info['pathogenInfo']['bounding_box'][i]),
+    #                                  size = (200, 200)
+    #                            )])
     
-    layout = [
-        [
-            Column(pathogenColumn)
-        ]
-    ]
+    # layout = [
+    #     [
+    #         Column(pathogenColumn)
+    #     ]
+    # ]
     
-    window = Window(title='Pipeline', layout=layout, size=(450, 600))
-    while True:
-        event, values = window.read()
-        if (event == WIN_CLOSED):
-            break
+    # window = Window(title='Pipeline', layout=layout, size=(450, 600))
+    # while True:
+    #     event, values = window.read()
+    #     if (event == WIN_CLOSED):
+    #         break
     
-    window.close()
+    # window.close()
     
-    cellColumn = [
-        [
-            Text('Cell information')
-        ]
-    ]
+    # cellColumn = [
+    #     [
+    #         Text('Cell information')
+    #     ]
+    # ]
     
-    for i in range(0, len(info['cellInfo']['area'])):
-        cellColumn.append([Text(form_cell_info(info['cellInfo'], i)),
-                           Image(reform_cropped_image_from_array(info['cellImages'][info['cellInfo']['image'][i]][1],
-                                                                 info['cellInfo']['bounding_box'][i]),
-                           size = (200, 200))
-        ])
-    # cellColumn.append([sg.Image(reform_image_from_array(info['cellInfo']['image'][0],
-    #                                                     info['cellInfo']['bounding_box'][0]))])
-    layout2 = [
-        [
-            Column(cellColumn, scrollable=True)
-        ]
-    ]
+    # for i in range(0, len(info['cellInfo']['area'])):
+    #     cellColumn.append([Text(form_cell_info(info['cellInfo'], i)),
+    #                        Image(reform_cropped_image_from_array(info['cellImages'][info['cellInfo']['image'][i]][1],
+    #                                                              info['cellInfo']['bounding_box'][i]),
+    #                        size = (200, 200))
+    #     ])
+    # # cellColumn.append([sg.Image(reform_image_from_array(info['cellInfo']['image'][0],
+    # #                                                     info['cellInfo']['bounding_box'][0]))])
+    # layout2 = [
+    #     [
+    #         Column(cellColumn, scrollable=True)
+    #     ]
+    # ]
     
-    window = Window(title='Pipeline', layout=layout2, size=(450, 600))
-    while True:
-        event, values = window.read()
-        if (event == WIN_CLOSED):
-            break
+    # window = Window(title='Pipeline', layout=layout2, size=(450, 600))
+    # while True:
+    #     event, values = window.read()
+    #     if (event == WIN_CLOSED):
+    #         break
     
 
 # def view_all(info, selectColumn):

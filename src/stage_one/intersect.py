@@ -1,4 +1,4 @@
-import collections
+from collections import defaultdict
 import math
 import os
 import matplotlib.pyplot as plt
@@ -8,8 +8,8 @@ import imagej
 import csv
 ij = imagej.init()
 
-from decision_tree import predict
-from helper import filter_one_hundred_mean_intensity
+from .decision_tree import predict
+from .helper import filter_one_hundred_mean_intensity
 
 # The function below takes in tuples of pathogen images and cell images (These tuples are generated
 # by label_images_otsu). Overall, it filters out extracellular pathogens, and calculates
@@ -28,8 +28,8 @@ def get_intersection_information(pathogenImages, cellImages, nucleiImages, saveP
     
     intracellularPathogens = obtain_intracellular_pathogens(labelledPathogen, labelledCell, pathogenImages)
 
-    pathogenInfo = collections.defaultdict(lambda: [])
-    cellInfo = collections.defaultdict(lambda: [])
+    pathogenInfo = defaultdict(list)
+    cellInfo = defaultdict(list)
 
     # Use regionprops_table on the cell labels by supplying the fully intracellular pathogens as an
     # intensity image. Then apply regionprops_table to find the intensity_mean, where 

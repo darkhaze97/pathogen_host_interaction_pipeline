@@ -7,3 +7,4 @@ pysimplegui
 pyimagej
 scikit-learn
 scipy
+dash

@@ -2,9 +2,9 @@ import numpy as np
 from skimage import measure
 import matplotlib.pyplot as plt
 
-from helper import filter_zero_mean_intensity
+from .helper import filter_zero_mean_intensity
 
-from voronoi import voronoi_seg, voronoi_seg_alt
+from .voronoi import voronoi_seg, voronoi_seg_alt
 
 # This function performs the brunt of the cell image correction. It removes nuclei only labels,
 # which are a by-product of combining cell and nuclei labels. In addition, it separates
@@ -88,13 +88,6 @@ def correct_segmentation(labelImg, origCellImg, nucleiImage, newLabelImg):
         # region can be potentially lost. Therefore, the corresponding pixels from the 
         # region have been added back in.
         newLabelImg[bound[0]:bound[2], bound[1]:bound[3]] = np.where(boundBox == 0, cellImg, boundBox)
-        
-        # NOTE: MAYBE SCAN THROUGH EACH CELL LABEL, THEN TAKE THE NUCLEI IMAGES
-        # WITH THE SAME BOUNDING BOX, AND THEN OBTAIN THE NUCLEI
-        # THAT ARE OVERLAPPING WITH THE CELL LABEL. THEN PERFORM VORONOI SEGMENTATION
-        # ON THE CENTROIDS. OVERLAP REGIONS, AND THE SECTIONS OF THE CELLS IN THE DIFF
-        # REGIONS CORRESPOND TO DIFF CELLS. NOTE THAT THIS SHOULD NOT RUN ON A CELL
-        # WITH ONE NUCLEUS.
 
 # This function is called after a voronoi segmentation. This is to fix the segmentation,
 # wherein a voronoi region may contain labels that are not adjacent to each other. This

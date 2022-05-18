@@ -10,10 +10,10 @@ import cProfile
 
 plt.style.use('fivethirtyeight')
 
-from correction import correct_segmentation
-from intersect import get_intersection_information
-from readout1 import readout
-from helper import obtain_file_names
+from .correction import correct_segmentation
+from .intersect import get_intersection_information
+from .readout1 import readout
+from .helper import obtain_file_names
 
 # The function below is to coordinate the analysis of the images. It first labels the
 # images, then finds the intersection of the pathogens with the cell labels. 
