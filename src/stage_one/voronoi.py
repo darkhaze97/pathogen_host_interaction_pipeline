@@ -3,21 +3,23 @@ from scipy.spatial import Voronoi, voronoi_plot_2d, cKDTree
 from skimage import draw, measure
 import matplotlib.pyplot as plt
 
-# The function below is to perform a voronoi segmentation.
-# ======================= TO DO WHEN FINISHED =======================
+# The function below is to help perform a voronoi segmentation. After the voronoi segmentation,
+# it passes the voronoi image to another function to perform post-processing to find
+# border vertices.
+# Arguments:
+#   - centroidList (list of tuples): A list of points for each centroid.
+#   - cellImg (numpy array): The image of the cell.
+# Returns:
+#   - The newly segmented image.
 # Resources used:
 #   https://stackoverflow.com/questions/57385472/how-to-set-a-fixed-outer-boundary-to-voronoi-tessellations
 def voronoi_seg(centroidList, cellImg):
-    # print('Shape: ', shape)
-    
     # First, fix the centroidList. Note that numpy orders their indexing
     # by row first, followed by column. Even though the indexing starts
     # from the top left in numpy, we don't need to change this, as the
     # math should account for this.
     for centroid in centroidList:
         centroid[0], centroid[1] = centroid[1], centroid[0]
-    
-    # print(shape[0], shape[1])
     
     inputPoints = np.array(centroidList)
     vor = Voronoi(inputPoints)
@@ -47,43 +49,57 @@ def voronoi_seg(centroidList, cellImg):
         ridges.setdefault(p1, []).append((p2, v1, v2))
         ridges.setdefault(p2, []).append((p1, v1, v2))
     
-    # print(ridges)
-    
     # mappedRidgeVertices is a list that contains tuples of vertices, each representing a ridge.
     mappedRidgeVertices = find_finite_ridge_endpoints(vor, ridges, cellImg, kdtree)
-    print(mappedRidgeVertices)
-    # print(vor.points, centroidList)
-    # print(vor.vertices)
-    # print(vor.ridge_points)
-    # print(vor.ridge_vertices)
-    # print(vor.regions)
-    # print(vor.point_region)
-    voronoi_plot_2d(vor)
-    plt.show()
-    # Below is to help draw lines on the cell image, to perform the voronoi segmentation.
-    separationImg = np.ones(cellImg.shape)
-    lineList = []
-    for v1, v2 in mappedRidgeVertices:
-        rr, cc, val = draw.line_aa(int(v1[1]), int(v1[0]), int(v2[1]), int(v2[0]))
-        separationImg[rr, cc] = 0
-        lineList.append((rr, cc))
-    separationImg = measure.label(separationImg)
+    return draw_aa_line(mappedRidgeVertices, cellImg, kdtree)
 
-    # For each (rr, cc) pair in lineList, find the midpoint pixel, and obtain
-    # the nearest centroid neighbour to this line. Then set the line defined by rr, cc
-    # to the label of the centroid pixel.
-    for rr, cc in lineList:
-        # I reverse the order of the x and y, since I will be passing the midpoint into
-        # a kdtree, which uses (col, row).
-        midpoint = (int((cc[-1] + cc[0])/2), int((rr[-1] + rr[0])/2))
-        # Find nearest neighbour with kdtree, and obtain the centroid pixel by indexing
-        # with vor.points. Then assign the line to the label of the centroid pixel.
-        dist, nearestNeighbour = kdtree.query(midpoint)
-        # Below obtains the pixel coordinates of the centroid. It converts
-        # floats into ints.
-        nearestCentroid = [int(p) for p in reversed(vor.points[nearestNeighbour])]
-        separationImg[rr, cc] = separationImg[nearestCentroid[0], nearestCentroid[1]]
-    return np.where(cellImg == 0, cellImg, cellImg + separationImg)
+# The function below is similar to voronoi_seg, however, it only performs the segmentation
+# for two cells. It simply forms a perpendicular line to the line between the two points.
+# Then, it attempts to find border vertices by using the orthogonal line that passes through the
+# midpoint of the line between the two points. This function does not use scipy.spatial.Voronoi.
+# Arguments:
+#   - centroidList (list of tuples): A list of points for each centroid.
+#   - cellImg (numpy array): The image of the cell.
+# Returns:
+#   - The newly segmented image.
+def voronoi_seg_alt(centroidList, cellImg):
+    maxX = cellImg.shape[1] - 1
+    maxY = cellImg.shape[0] - 1
+    
+    for centroid in centroidList:
+        centroid[0], centroid[1] = centroid[1], centroid[0]
+    
+    kdtree = cKDTree(centroidList)
+    
+    midpoint = np.array(centroidList).mean(axis=0)
+    gradVec = midpoint - centroidList[0]
+    orthogonal = [gradVec[1], -gradVec[0]]
+    # The equation that we will use is midpoint + epsilon * orthogonal = <x, y>,
+    # where x or y will be defined.
+    # borderVertices will store the vertices that are on the border and on the line
+    # defined by midpoint + epsilon * orthogonal = <x, y>. Ultimately, len(borderVertices)
+    # should be 2.
+    borderVertices = []
+    
+    # Solve for y when x is fixed to 0.
+    y = solve_y(0, midpoint, orthogonal)
+    if (valid_within_borders(y, maxY)): borderVertices.append((0, y))
+    
+    # Solve for y when x is fixed to cellImg[1] - 1
+    y = solve_y(maxX, midpoint, orthogonal)
+    if (valid_within_borders(y, maxY)): borderVertices.append((maxX, y))
+    
+    # Solve for x when y is fixed to 0.
+    x = solve_x(0, midpoint, orthogonal)
+    if (valid_within_borders(x, maxX)): borderVertices.append((x, 0))
+    
+    # Solve for x when y is fixed to maxY
+    x = solve_x(maxY, midpoint, orthogonal)
+    if (valid_within_borders(x, maxX)): borderVertices.append((x, maxY))
+    
+    borderVertices = [tuple(borderVertices)]
+    
+    return draw_aa_line(borderVertices, cellImg, kdtree)
 
 # The function below finds the endpoints for infinite ridges. It returns the set of vertices that
 # form the voronoi segmentation.
@@ -153,44 +169,63 @@ def determine_edge_vertex(p1, p2, vIndex, shape, vor, kdtree):
     # Find the gradient vector. The gradient will be the line from the
     # ridge vertex to the midpoint.
     gradVec = midpoint - vertex
-    print("For the vertex: ", vertex, ", and the midpoint: ", midpoint, ", we have gradient: ", gradVec)
     # There are 4 borders to check for intersection: x = 0, x = shape[1], y = 0, y = shape[0]
     # And we have an equation like so: a * gradVec + vertex = <x, y>, where x or y is known, as they
     # are the borders, and a is any real number.
 
     # First, fix x and solve for y when x = 0
-    epsilon = (-vertex[0])/gradVec[0]
-    y = gradVec[1] * epsilon + vertex[1]
+    y = solve_y(0, vertex, gradVec)
     # Below checks if y lies within our borders. If it does, it will determine if the nearest
     # neighbours match p1 and p2. If it does, return [0, y], else, continue.
     ret = valid_neighbours(None, y, 0, kdtree, vor, pointSet) if valid_within_borders(y, maxY) else []
     if (ret): return ret
 
     # Next, fix x and solve for y when x = shape[1] - 1
-    epsilon = (maxX - vertex[0])/gradVec[0]
-    y = gradVec[1] * epsilon + vertex[1]
+    y = solve_y(maxX, vertex, gradVec)
     # Below checks if y lies within our borders. If it does, it will determine if the nearest
     # neighbours match p1 and p2. If it does, return [maxX, y], else, continue.
     ret = valid_neighbours(None, y, maxX, kdtree, vor, pointSet) if valid_within_borders(y, maxY) else []
     if (ret): return ret
     
     # Next, fix y and solve for x when y = 0
-    epsilon = (-vertex[1])/gradVec[1]
-    x = gradVec[0] * epsilon + vertex[0]
+    x = solve_x(0, vertex, gradVec)
     # Below checks if x lies within our borders. If it does, it will determine if the nearest
     # neighbours match p1 and p2. If it does, return [x, 0], else, continue.
     ret = valid_neighbours(x, None, 0, kdtree, vor, pointSet) if valid_within_borders(x, maxX) else []
     if (ret): return ret
 
     # Next, fix y and solve for x when y = shape[0] - 1
-    epsilon = (maxY - vertex[1])/gradVec[1]
-    x = gradVec[0] * epsilon + vertex[0]
+    x = solve_x(maxY, vertex, gradVec)
     # Below checks if x lies within our borders. If it does, it will determine if the nearest
     # neighbours match p1 and p2. If it does, return [x, maxY], else, continue.
     ret = valid_neighbours(x, None, maxY, kdtree, vor, pointSet) if valid_within_borders(x, maxX) else []
     if (ret): return ret
     print('How did we even end up here.')
-    
+
+# Function below is to solve: vertex + epsilon * gradVec = <x, y>, for when x is fixed.
+# Used to find the border vertices of a voronoi ridge.
+# Arguments:
+#   - x (int): The value to set x to.
+#   - vertex (tuple)
+#   - gradVec (tuple)
+# Returns:
+#   - y, which is equal to gradVec[1] * epsilon + vertex[1]
+def solve_y(x, vertex, gradVec):
+    epsilon = (x - vertex[0])/gradVec[0]
+    return gradVec[1] * epsilon + vertex[1]
+
+# Function below is to solve: vertex + epsilon * gradVec = <x, y>, for when y is fixed.
+# Used to find the border vertices of a voronoi ridge.
+# Arguments:
+#   - y (int): The value to set y to.
+#   - vertex (tuple)
+#   - gradVec (tuple)
+# Returns:
+#   - x, which is equal to gradVec[0] * epsilon + vertex[0]
+def solve_x(y, vertex, gradVec):
+    epsilon = (y - vertex[1])/gradVec[1]
+    return gradVec[0] * epsilon + vertex[0]
+
 # This function simply computes if value >= 0 and value <= maxBorderValue. It makes sure
 # that the potential vertex is within the bounds of our image.
 # Arguments:
@@ -226,7 +261,40 @@ def valid_neighbours(x, y, fixedBorder, kdtree, vor, pointSet):
     # If statement below checks if the computed 2 nearest neighbours
     # matches p1 and p2.
     if ({tuple(p) for p in vor.points[nearest2Neighbours]} == pointSet):
-        print(f'Intersect with y = {fixedBorder}: ', vertex) if x else \
-        print(f'Intersect with x = {fixedBorder}: ', vertex)
         return tuple(vertex)
     return []
+
+# The function below simply draws voronoi ridges on the cellImg. It then assigns the ridge
+# the label of an adjacent region.
+# Arguments:
+#   - mappedRidgeVertices (list of tuples): The list of vertex pairs that form a voronoi ridge
+#   - cellImg (numpy array): The image of the cell.
+#   - kdtree: A data structure used to find the nearest points.
+# Returns:
+#   - The cell image that is segmented with the voronoi ridges.
+def draw_aa_line(mappedRidgeVertices, cellImg, kdtree):
+    # Below is to help draw lines on the cell image, to perform the voronoi segmentation.
+    separationImg = np.ones(cellImg.shape)
+    lineList = []
+    for v1, v2 in mappedRidgeVertices:
+        rr, cc, val = draw.line_aa(int(v1[1]), int(v1[0]), int(v2[1]), int(v2[0]))
+        separationImg[rr, cc] = 0
+        lineList.append((rr, cc))
+    separationImg = measure.label(separationImg)
+
+    # For each (rr, cc) pair in lineList, find the midpoint pixel, and obtain
+    # the nearest centroid neighbour to this line. Then set the line defined by rr, cc
+    # to the label of the centroid pixel.
+    for rr, cc in lineList:
+        # I reverse the order of the x and y, since I will be passing the midpoint into
+        # a kdtree, which uses (col, row).
+        midpoint = (int((cc[-1] + cc[0])/2), int((rr[-1] + rr[0])/2))
+        # Find nearest neighbour with kdtree, and obtain the centroid pixel by indexing
+        # with vor.points. Then assign the line to the label of the centroid pixel.
+        dist, nearestNeighbour = kdtree.query(midpoint)
+        # Below obtains the pixel coordinates of the centroid. It converts
+        # floats into ints.
+        nearestCentroid = [int(p) for p in kdtree.data[nearestNeighbour]]
+        # nearestCentroid = [int(p) for p in reversed(vor.points[nearestNeighbour])]
+        separationImg[rr, cc] = separationImg[nearestCentroid[0], nearestCentroid[1]]
+    return np.where(cellImg == 0, cellImg, cellImg + separationImg)
