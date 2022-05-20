@@ -2,12 +2,15 @@
 import sys
 import PySimpleGUI as sg
 from dash import Dash, html
+import dash_bootstrap_components as dbc
 from PySimpleGUI import Text, Image, Window, Column, Button, WIN_CLOSED
 import cv2
 import pickle
 import tkinter as tk
 # from PIL import Image, ImageTk
 import matplotlib.pyplot as plt
+
+from .ComponentLibrary import sidebar
 
 # The variable below is to help print out statistics associated with each entity.
 # Each stat, e.g. area, will be connected to a lambda function, which will print out
@@ -35,10 +38,23 @@ statPrinter = {
 }
 
 def visualize(info):
-    app = Dash(__name__)
+    print(info)
+    app = Dash(
+        __name__,
+        external_stylesheets=[dbc.themes.BOOTSTRAP,
+                              "https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"
+        ]
+    )
     
     app.layout = html.Div(
-        children='Bye! Thre!'
+        children=[
+            sidebar.generateSidebar(info)
+
+        ],
+        style={
+            'width': '100%',
+            'height': '100%'
+        }
     )
     
     app.run_server(debug=True)

@@ -8,3 +8,4 @@ pyimagej
 scikit-learn
 scipy
 dash
+dash-bootstrap-components
