@@ -51,7 +51,7 @@ def voronoi_seg(centroidList, cellImg):
     
     # mappedRidgeVertices is a list that contains tuples of vertices, each representing a ridge.
     mappedRidgeVertices = find_finite_ridge_endpoints(vor, ridges, cellImg, kdtree)
-    return draw_aa_line(mappedRidgeVertices, cellImg, kdtree)
+    return draw_aa_line(mappedRidgeVertices, cellImg, kdtree, vor)
 
 # The function below is similar to voronoi_seg, however, it only performs the segmentation
 # for two cells. It simply forms a perpendicular line to the line between the two points.
@@ -99,7 +99,7 @@ def voronoi_seg_alt(centroidList, cellImg):
     
     borderVertices = [tuple(borderVertices)]
     
-    return draw_aa_line(borderVertices, cellImg, kdtree)
+    return draw_aa_line(borderVertices, cellImg, kdtree, None)
 
 # The function below finds the endpoints for infinite ridges. It returns the set of vertices that
 # form the voronoi segmentation.
@@ -272,7 +272,7 @@ def valid_neighbours(x, y, fixedBorder, kdtree, vor, pointSet):
 #   - kdtree: A data structure used to find the nearest points.
 # Returns:
 #   - The cell image that is segmented with the voronoi ridges.
-def draw_aa_line(mappedRidgeVertices, cellImg, kdtree):
+def draw_aa_line(mappedRidgeVertices, cellImg, kdtree, vor):
     # Below is to help draw lines on the cell image, to perform the voronoi segmentation.
     separationImg = np.ones(cellImg.shape)
     lineList = []
@@ -294,7 +294,7 @@ def draw_aa_line(mappedRidgeVertices, cellImg, kdtree):
         dist, nearestNeighbour = kdtree.query(midpoint)
         # Below obtains the pixel coordinates of the centroid. It converts
         # floats into ints.
-        nearestCentroid = [int(p) for p in kdtree.data[nearestNeighbour]]
+        nearestCentroid = [int(p) for p in reversed(kdtree.data[nearestNeighbour])]
         # nearestCentroid = [int(p) for p in reversed(vor.points[nearestNeighbour])]
         separationImg[rr, cc] = separationImg[nearestCentroid[0], nearestCentroid[1]]
     return np.where(cellImg == 0, cellImg, cellImg + separationImg)
