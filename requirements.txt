@@ -3,6 +3,7 @@ tensorflow
 opencv-python
 scikit-image
 pandas
+Pillow
 pysimplegui
 pyimagej
 scikit-learn

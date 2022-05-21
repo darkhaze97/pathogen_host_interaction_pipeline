@@ -1,7 +1,7 @@
 from dash import html
 import dash_bootstrap_components as dbc
 
-def generateSidebar(info):
+def sidebar(info):
     # Extract the names of each image.
     imgNames = [(cellInfo[2].split('/'))[-1] for cellInfo in info['cellImages']]
     

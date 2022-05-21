@@ -10,7 +10,7 @@ import tkinter as tk
 # from PIL import Image, ImageTk
 import matplotlib.pyplot as plt
 
-from .ComponentLibrary import sidebar
+import ComponentLibrary
 
 # The variable below is to help print out statistics associated with each entity.
 # Each stat, e.g. area, will be connected to a lambda function, which will print out
@@ -38,7 +38,7 @@ statPrinter = {
 }
 
 def visualize(info):
-    print(info)
+    # print(info)
     app = Dash(
         __name__,
         external_stylesheets=[dbc.themes.BOOTSTRAP,
@@ -48,12 +48,13 @@ def visualize(info):
     
     app.layout = html.Div(
         children=[
-            sidebar.generateSidebar(info)
+            ComponentLibrary.sidebar(info),
+            ComponentLibrary.mainview(info)
 
         ],
         style={
             'width': '100%',
-            'height': '100%'
+            'height': '100vh'
         }
     )
     
