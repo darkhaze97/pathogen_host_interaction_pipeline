@@ -1,19 +1,21 @@
-from dash import html
+from dash import html, Output, Input
 import dash_bootstrap_components as dbc
 
-def sidebar(info):
+def sidebar(imgNameMap):
     # Extract the names of each image.
-    imgNames = [(cellInfo[2].split('/'))[-1] for cellInfo in info['cellImages']]
-    
-    # @app.callback() --> This is to update the centre image.
+    imgNames = [name for name in imgNameMap.keys()]
     
     return html.Div(
-        dbc.Nav(
-            [dbc.NavLink(name, href=f"/{name}", active="exact", id=name)
-            for name in imgNames],
-            vertical=True,
-            pills=True
-        ),
+        [
+            dbc.RadioItems(
+                id="img-select",
+                inputClassName="btn-check",
+                labelClassName="btn btn-outline-primary",
+                labelCheckedClassName="active",
+                options=[{'label': name, 'value': name} for name in imgNames],
+                value=imgNames[0]
+            )
+        ],
         style={
             'backgroundColor': 'lightblue',
             'top': 0,

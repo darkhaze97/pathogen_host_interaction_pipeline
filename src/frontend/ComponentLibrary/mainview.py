@@ -1,25 +1,45 @@
-from dash import html
+from dash import html, dcc
+import dash_bootstrap_components as dbc
 from PIL import Image
 import numpy as np
 
 from .imagebox import imagebox
 
-def mainview(info):
-    print(info['cellImages'][0][0])
-    # data = np.reshape((info['cellImages'][0][0]), (1024, 720))
-    data = Image.fromarray(info['cellImages'][0][0].astype(np.uint8))
-    data.save('lol.png')
+def mainview(imgNameMap):
+    data = imgNameMap[(list(imgNameMap.keys()))[0]][1]
     return html.Div(
-        children=[imagebox(data)],
+        [
+            imagebox(data),
+            filter_seg()
+        ],
         style={
-            'backgroundColor': 'blue',
-            'top': 0,
             'margin-left': '18%',
             'width': '82%',
-            'height': '100%',
-            'position': 'static'
+            'height': '100%'
         }
     )
+    
+def filter_seg():
+    return html.Div(
+        [
+            dbc.RadioItems(
+                id="main-img-filter",
+                className="btn-group",
+                inputClassName="btn-check",
+                labelClassName="btn btn-outline-primary",
+                labelCheckedClassName="active",
+                options = 
+                    [
+                        {'label': 'Show all labels', 'value': 'show-all'},
+                        {'label': 'Show selected labels', 'value': 'show-selected'}
+                    ],
+                value = '',
+           )
+        ],
+        className="radio-group"
+    )
+    
+    
 # Checkboxes
 # Able to select: Show all segmentation labels
 # Able to select: Show segmentation label of selected cell

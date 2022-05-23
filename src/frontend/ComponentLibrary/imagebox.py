@@ -5,6 +5,7 @@ def imagebox(data):
     
     return html.Img(
         src=data,
+        id="main-img",
         style={
             'width': '100%',
             'height': '50%',

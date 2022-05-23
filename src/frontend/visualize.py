@@ -1,13 +1,14 @@
 
 import sys
 import PySimpleGUI as sg
-from dash import Dash, html
+from dash import Dash, html, dcc, Output, Input, ctx
 import dash_bootstrap_components as dbc
 from PySimpleGUI import Text, Image, Window, Column, Button, WIN_CLOSED
 import cv2
 import pickle
 import tkinter as tk
-# from PIL import Image, ImageTk
+from PIL import Image, ImageTk
+import numpy as np
 import matplotlib.pyplot as plt
 
 import ComponentLibrary
@@ -39,17 +40,22 @@ statPrinter = {
 
 def visualize(info):
     # print(info)
+    
+    # Obtain the names of each cell image, and use a hash table to map a cell image
+    # name to an image.
+    imgNameMap = {}
+    for label, bwImg, path in info['cellImages']:
+        imgNameMap[(path.split('/'))[-1]] = (label, Image.fromarray(bwImg.astype(np.uint8)))
+    
     app = Dash(
         __name__,
-        external_stylesheets=[dbc.themes.BOOTSTRAP,
-                              "https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"
-        ]
+        external_stylesheets=[dbc.themes.BOOTSTRAP]
     )
     
     app.layout = html.Div(
         children=[
-            ComponentLibrary.sidebar(info),
-            ComponentLibrary.mainview(info)
+            ComponentLibrary.sidebar(imgNameMap),
+            ComponentLibrary.mainview(imgNameMap)
 
         ],
         style={
@@ -57,193 +63,25 @@ def visualize(info):
             'height': '100vh'
         }
     )
+
+    # This is to update the centre image.
+    @app.callback(
+        Output("main-img", "src"),
+        Input("img-select", "value"),
+        Input("main-img-filter", "value"))
+    def updateCellImg(file_name, filter):
+        # NEXT: If I reselect the already selected filter, then I should simply do nothing
+        print(file_name)
+        if (filter == 'show-all'):
+            # Present the labelled image overlapped
+            # For now, just show labelled image.
+            print('Wt')
+        elif (filter == 'show-selected'):
+            # Only show label of current selection.
+            print('Lol')
+        return imgNameMap[file_name][1]
     
     app.run_server(debug=True)
-    # root = tk.Tk()
-    # canv = tk.Canvas(root, width=1048, height=1048, bg='white')
-    # canv.grid(row=2, column=3)
-    # img = Image.open("A01f00p00d00.png")
-    # img = img.resize((400, 400))
-    # img = ImageTk.PhotoImage(img)  # PIL solution
-    # canv.create_image(0, 0, anchor=tk.NW, image=img)
-    # root.mainloop()
-    
-#     global window
-#     window = tk.Tk()
-    
-#     window.columnconfigure([0, 1, 2], minsize=150)
-
-#     global viewingColumn
-#     viewingColumn = tk.Frame(master=window)
-#     viewingColumn.grid(row=0, column=2)
-#     label2 = tk.Label(master=viewingColumn)
-#     label2.pack()
-    
-#     global selectSpecificColumn
-#     selectSpecificColumn = tk.Frame(master=window)
-#     selectSpecificColumn.grid(row=0, column=1)
-
-#     selectColumn = tk.Frame(master=window)
-#     selectColumn.grid(row=0, column=0)
-#     selectColumn.rowconfigure([0, 1, 2], minsize=50)
-#     viewAllButton = tk.Button(master=selectColumn,
-#                               text='View whole images',
-#                               command = lambda:view_all(info, selectSpecificColumn))
-#     selectColumnLabel = tk.Label(master=selectColumn, text='Select types of images to view.')
-#     selectColumnLabel.grid(row=0, column=0)
-    
-#     viewAllButton.grid(row=1, column=0)
-
-#     viewPathogenButton = tk.Button(master=selectColumn,
-#                                    text='View pathogen labels')
-#     viewPathogenButton.grid(row=2, column=0)
-
-#     viewCellButton = tk.Button(master=selectColumn, text='View cell labels')
-#     viewCellButton.grid(row=3, column=0)
-
-    
-#     window.mainloop()
-    
-    # selectColumn = [
-    #     [
-    #         Button('View whole images', key='#wholeimages')
-    #     ],
-    #     [
-    #         Button('View pathogen labels'),
-    #     ],
-    #     [
-    #         Button('View cell labels')
-    #     ]
-    # ]
-    
-    # selectSpecific = []
-    # viewingColumn = []
-    
-    # baseLayout = [
-    #     [
-    #         Column(selectColumn),
-    #         Column(selectSpecific, key='#selectspecificimage'),
-    #         Column(viewingColumn, key='#viewingcolumn')
-    #     ]
-    # ]
-    
-    # window = Window(title='Pipeline', layout=baseLayout)
-    
-    # while True:
-    #     event, values = window.read()
-    #     if (event == WIN_CLOSED):
-    #         break
-    #     elif (event == '#wholeimages'):
-    #         selectSpecificCol = window['#selectspecificimage']
-    #         buttonList = []
-    #         for i in range(0, len(info['cellImages'])):
-    #             buttonList.append([Button('Field of view #' + str(i))])
-    #         print('HARR')
-    #         selectSpecificCol.update(buttonList)
-    #         window.close()
-    
-    # pathogenColumn = [
-    #     [
-    #         Text('Pathogen information')
-    #     ]
-    # ]
-    
-    # for i in range(0, len(info['pathogenInfo']['area'])):
-    #     pathogenColumn.append([Text(form_pathogen_info(info['pathogenInfo'],i)),
-    #                            Image(reform_cropped_image_from_array(info['pathogenImages'][info['pathogenInfo']['image'][i]][1],
-    #                                                                  info['pathogenInfo']['bounding_box'][i]),
-    #                                  size = (200, 200)
-    #                            )])
-    
-    # layout = [
-    #     [
-    #         Column(pathogenColumn)
-    #     ]
-    # ]
-    
-    # window = Window(title='Pipeline', layout=layout, size=(450, 600))
-    # while True:
-    #     event, values = window.read()
-    #     if (event == WIN_CLOSED):
-    #         break
-    
-    # window.close()
-    
-    # cellColumn = [
-    #     [
-    #         Text('Cell information')
-    #     ]
-    # ]
-    
-    # for i in range(0, len(info['cellInfo']['area'])):
-    #     cellColumn.append([Text(form_cell_info(info['cellInfo'], i)),
-    #                        Image(reform_cropped_image_from_array(info['cellImages'][info['cellInfo']['image'][i]][1],
-    #                                                              info['cellInfo']['bounding_box'][i]),
-    #                        size = (200, 200))
-    #     ])
-    # # cellColumn.append([sg.Image(reform_image_from_array(info['cellInfo']['image'][0],
-    # #                                                     info['cellInfo']['bounding_box'][0]))])
-    # layout2 = [
-    #     [
-    #         Column(cellColumn, scrollable=True)
-    #     ]
-    # ]
-    
-    # window = Window(title='Pipeline', layout=layout2, size=(450, 600))
-    # while True:
-    #     event, values = window.read()
-    #     if (event == WIN_CLOSED):
-    #         break
-    
-
-# def view_all(info, selectColumn):
-#     global selectColumnInfo, selectSpecificColumn
-#     clear_select_column()
-#     selectColumnInfo = tk.Frame(master=selectSpecificColumn)
-#     selectColumnInfo.columnconfigure([0, 1, 2], minsize=50)
-#     for i in range(0, len(info['cellImages'])):
-#         label = tk.Button(master=selectColumnInfo,
-#                           text='Field of view #' + str(i),
-#                           command=lambda:show_all_image(info['nucleiImages'][i],
-#                                                         info['pathogenImages'][i],
-#                                                         info['cellImages'][i]))
-#         label.pack()
-#     selectColumnInfo.pack()
-    
-# def show_all_image(nucleiImage, pathogenImage, cellImage):
-#     global viewingColumnInfo, viewingColumn
-#     clear_viewing_column()
-#     viewingColumnInfo = tk.Frame(master=viewingColumn)
-#     viewingColumnInfo.columnconfigure([0, 1, 2], minsize=50)
-#     nuclei = tk.Canvas(viewingColumnInfo)
-#     nuclei.grid(row=0, column=0)
-#     img = ImageTk.PhotoImage(image=Image.fromarray(nucleiImage[1]))
-    
-#     # plt.imshow(nucleiImage[0])
-#     # plt.show()
-#     # img = ImageTk.PhotoImage(Image.open())
-#     nuclei.create_image(20, 20, anchor=tk.NW, image=img)
-#     # label = tk.Label(master=viewingColumnInfo, text='Hi I gu')
-#     # label.grid(row=0, column=0)
-#     # label = tk.Label(master=viewingColumnInfo, image=img)
-#     # label.grid(row=0, column=0)
-#     viewingColumnInfo.pack()
-    
-# def clear_select_column():
-#     global selectColumnInfo
-#     # Try block is for when the program first starts, and selectColumnInfo is not yet
-#     # defined.
-#     try:
-#         selectColumnInfo.pack_forget()
-#     except:
-#         print('Continuing')
-
-# def clear_viewing_column():
-#     global viewingColumnInfo
-#     try:
-#         viewingColumnInfo.pack_forget()
-#     except:
-#         print('Continuing')
 
 def form_pathogen_info(info, index):
     retStr = 'Pathogen number: ' + str(index)
