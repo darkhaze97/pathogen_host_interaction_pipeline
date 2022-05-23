@@ -51,7 +51,17 @@ def voronoi_seg(centroidList, cellImg):
     
     # mappedRidgeVertices is a list that contains tuples of vertices, each representing a ridge.
     mappedRidgeVertices = find_finite_ridge_endpoints(vor, ridges, cellImg, kdtree)
-    return draw_aa_line(mappedRidgeVertices, cellImg, kdtree)
+
+    meh = draw_aa_line(mappedRidgeVertices, cellImg, kdtree)
+    # print(vor.points, centroidList)
+    # print(vor.vertices)
+    # print(vor.ridge_points)
+    # print(vor.ridge_vertices)
+    # print(vor.regions)
+    # print(vor.point_region)
+    # voronoi_plot_2d(vor)
+    # plt.show()
+    return meh
 
 # The function below is similar to voronoi_seg, however, it only performs the segmentation
 # for two cells. It simply forms a perpendicular line to the line between the two points.
@@ -112,6 +122,8 @@ def voronoi_seg_alt(centroidList, cellImg):
 #   - The list of ridge points, including the vertices that were computed from 
 #     infinite ridges.
 def find_finite_ridge_endpoints(vor, ridges, cellImg, kdtree):
+    maxX, maxY = np.shape(cellImg)[1] - 1, np.shape(cellImg)[0] - 1
+    
     # mappedRidgeVertices is a list that contains tuples of vertices, each representing a ridge.
     mappedRidgeVertices = set()
     for p1 in range(len(vor.point_region)):
@@ -125,11 +137,44 @@ def find_finite_ridge_endpoints(vor, ridges, cellImg, kdtree):
                 # Add the return from the function to allVertices and ridgeVertices
                 # The reason why we pass max(v1, v2) in is because we want to use
                 # the defined vertex as a way to find the gradient of the ridge.
-                edgeVertex = determine_edge_vertex(p1, p2, max(v1, v2), np.shape(cellImg), vor, kdtree)
-                mappedRidgeVertices.add((tuple(vor.vertices[max(v1, v2)]), edgeVertex))
+                edgeVertex = determine_edge_vertex(p1, p2, max(v1, v2), np.shape(cellImg),
+                                                   vor, kdtree, False)
+                if (edgeVertex): mappedRidgeVertices.add((tuple(vor.vertices[max(v1, v2)]), edgeVertex))
             else:
-                mappedRidgeVertices.add(tuple([tuple(v) for v in vor.vertices[[v1, v2]]]))
+                # We have a finite ridge.
+                # Check if a vertex of the ridge is outside of the borders, whilst another is
+                # inside the borders.
+                vert1, vert2 = vor.vertices[[v1, v2]]
+                newV1 = -1 if (not valid_within_borders(vert1[0], maxX) or not valid_within_borders(vert1[1], maxY)) \
+                           else v1
+                newV2 = -1 if (not valid_within_borders(vert2[0], maxX) or not valid_within_borders(vert2[1], maxY)) \
+                           else v2
+                if (newV1 >= 0 and newV2 >= 0):
+                    # We enter here if both vertices are within the image dimensions.
+                    mappedRidgeVertices.add(tuple([tuple(v) for v in vor.vertices[[v1, v2]]]))
+                elif (max(newV1, newV2) >= 0):
+                    # We enter here if only one vertex is outside of the image dimensions.
+                    # Find the edge vertex, similar to when there is an infinite ridge.
+                    edgeVertex = determine_edge_vertex(p1, p2, max(newV1, newV2), np.shape(cellImg),
+                                                       vor, kdtree, False)
+                    if (edgeVertex): mappedRidgeVertices.add((tuple(vor.vertices[max(newV1, newV2)]), edgeVertex))
+                else:
+                    # We enter here if both of the ridge vertices are outside of the main
+                    # image dimensions.
+                    edgeVertex = determine_edge_vertex(v1, v2, max(v1, v2), np.shape(cellImg),
+                                                       vor, kdtree, True)
+                                                   
+    # print(mappedRidgeVertices)
     return mappedRidgeVertices
+
+def determine_finite_edge_vertices(p1, p2, v1, v2, shape, vor, kdtree):
+    # Extract the maxX value and the maxY value.
+    maxX = shape[1] - 1
+    maxY = shape[0] - 1
+    # First, make a point set with p1 and p2. This will be used to compare if the 
+    # nearest 2 neighbours are in fact p1 and p2.
+    pointSet = {tuple(p) for p in vor.points[[p1, p2]]}
+    # Decide which edges the ridge collides with.
 
 # This function returns a valid edge vertex, based on the voronoi segmentation.
 # Arguments:
@@ -149,7 +194,10 @@ def find_finite_ridge_endpoints(vor, ridges, cellImg, kdtree):
 #                    intersect one valid border. (Valid == x and y values between 0 and maxX or maxY
 #                    inclusive, and is equidistant to p1 and p2, which are it's nearest neighbours).
 # Sources: # https://stackoverflow.com/questions/17857021/finding-voronoi-regions-that-contain-a-list-of-arbitrary-coordinates
-def determine_edge_vertex(p1, p2, vIndex, shape, vor, kdtree):
+def determine_edge_vertex(p1, p2, vIndex, shape, vor, kdtree, twoPt):
+    
+    ridgePoints = []
+    
     # Extract the maxX value and the maxY value.
     maxX = shape[1] - 1
     maxY = shape[0] - 1
@@ -178,29 +226,32 @@ def determine_edge_vertex(p1, p2, vIndex, shape, vor, kdtree):
     # Below checks if y lies within our borders. If it does, it will determine if the nearest
     # neighbours match p1 and p2. If it does, return [0, y], else, continue.
     ret = valid_neighbours(None, y, 0, kdtree, vor, pointSet) if valid_within_borders(y, maxY) else []
-    if (ret): return ret
+    if (ret): ridgePoints.append(ret)
 
     # Next, fix x and solve for y when x = shape[1] - 1
     y = solve_y(maxX, vertex, gradVec)
     # Below checks if y lies within our borders. If it does, it will determine if the nearest
     # neighbours match p1 and p2. If it does, return [maxX, y], else, continue.
     ret = valid_neighbours(None, y, maxX, kdtree, vor, pointSet) if valid_within_borders(y, maxY) else []
-    if (ret): return ret
+    if (ret): ridgePoints.append(ret)
     
     # Next, fix y and solve for x when y = 0
     x = solve_x(0, vertex, gradVec)
     # Below checks if x lies within our borders. If it does, it will determine if the nearest
     # neighbours match p1 and p2. If it does, return [x, 0], else, continue.
     ret = valid_neighbours(x, None, 0, kdtree, vor, pointSet) if valid_within_borders(x, maxX) else []
-    if (ret): return ret
+    if (ret): ridgePoints.append(ret)
 
     # Next, fix y and solve for x when y = shape[0] - 1
     x = solve_x(maxY, vertex, gradVec)
     # Below checks if x lies within our borders. If it does, it will determine if the nearest
     # neighbours match p1 and p2. If it does, return [x, maxY], else, continue.
     ret = valid_neighbours(x, None, maxY, kdtree, vor, pointSet) if valid_within_borders(x, maxX) else []
-    if (ret): return ret
-    print('How did we even end up here.')
+    if (ret): ridgePoints.append(ret)
+
+    return None if (not ridgePoints) else ridgePoints[0] if (not twoPt) else ridgePoints
+    
+    # print('How did we even end up here.')
 
 # Function below is to solve: vertex + epsilon * gradVec = <x, y>, for when x is fixed.
 # Used to find the border vertices of a voronoi ridge.

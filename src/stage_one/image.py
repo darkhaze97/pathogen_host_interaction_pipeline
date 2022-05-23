@@ -10,10 +10,10 @@ import cProfile
 
 plt.style.use('fivethirtyeight')
 
-from .correction import correct_segmentation
-from .intersect import get_intersection_information
-from .readout1 import readout
-from .helper import obtain_file_names
+from correction import correct_segmentation
+from intersect import get_intersection_information
+from readout1 import readout
+from helper import obtain_file_names
 
 # The function below is to coordinate the analysis of the images. It first labels the
 # images, then finds the intersection of the pathogens with the cell labels. 
@@ -73,7 +73,7 @@ def image_analysis(nucleiPath, pathogenPath, cellPath, threshold, savePath):
 # returns:
 #   - label_images_otsu(path): A list of the labelled images.
 def label_nuclei_images(path, threshold):
-    return label_images_otsu(path, None, threshold)
+    return label_images_otsu(path, None, threshold, True, False)
 
 # This function is to help segment the pathogen images. It takes in a path to the
 # pathogen images.
@@ -82,7 +82,7 @@ def label_nuclei_images(path, threshold):
 # returns:
 #   - label_images_otsu(path): A list of the labelled images.
 def label_pathogen_images(path, threshold):
-    return label_images_otsu(path, None, threshold)
+    return label_images_otsu(path, None, threshold, False, True)
 
 # This function is to help segment the cell images. It takes in a path to the
 # cell images and nuclei images. The nuclei images help fill in holes in the cell.
@@ -95,7 +95,7 @@ def label_pathogen_images(path, threshold):
 # returns:
 #   - label_images_huang(path): A list of the labelled cell images.
 def label_cell_images(path, nucleiImages, threshold):
-    return label_images_otsu(path, nucleiImages, threshold)
+    return label_images_otsu(path, nucleiImages, threshold, False, True)
 
 # The function below takes in a path, and scans through the images to
 # then return a list of the labelled images. This function is made to reduce
@@ -103,13 +103,24 @@ def label_cell_images(path, nucleiImages, threshold):
 # arguments:
 #   - path (string): The path to the directory that will have the images that are to be
 #                    segmented.
+#   - nucleiImages (list of numpy arrays): The nuclei images. This is set to None when
+#                                          nuclei or pathogens are being labelled.
+#                                          This is not none when labelling cells.
+#   - threshold (int): The value to set the threshold of the segmentation.
+#   - preProcess (bool): A bool indicating whether the image currently being labelled
+#                        requires pre-processing. This is mainly used for nuclei, when
+#                        broken nuclei need to be reconnected.
+#   - postProcess (bool): A bool indicating whether the image currently being labelled
+#                         requires post-processing. Mainly used for pathogens and cells.
+#                         Not used for nuclei, as post processing removes border labels,
+#                         which are still required when generating cell labels.
 # returns:
 #   - list<(labelled images (list), images (list), imagePath (string))>: A list with tuples of labelled
 #                                                        images, and segmented images
 # Resources used: 
 #   - https://www.geeksforgeeks.org/python-thresholding-techniques-using-opencv-set-3-otsu-thresholding/
 #   - https://www.youtube.com/watch?v=qfUJHY3ku9k
-def label_images_otsu(path, nucleiImages, threshold):
+def label_images_otsu(path, nucleiImages, threshold, preProcess, postProcess):
     images = []
     # i is the index to calculate which nucleiImage we are up to (if we are currently
     # attempting to label the cell images.)
@@ -124,6 +135,13 @@ def label_images_otsu(path, nucleiImages, threshold):
         # and therefore improve segmentation.
         if (not nucleiImages == None):
             greyImage = apply_clahe(greyImage)
+            
+        # If the current images we are analysing are nuclei, then we need to dilate
+        # the nuclei. This is to reconnect labels.
+        if (preProcess):
+            greyImage = morphology.dilation(greyImage, morphology.square(6))
+
+        # greyImage = morphology.dilation(greyImage, morphology.square(6))
 
         ret, alteredImg = cv2.threshold(greyImage, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU) \
                           if (threshold == None) else \
@@ -135,13 +153,17 @@ def label_images_otsu(path, nucleiImages, threshold):
         # Place unique labels on segmented areas
         labelImg = measure.label(alteredImg, connectivity=greyImage.ndim) if (nucleiImages == None) \
                    else process_cell(alteredImg, nucleiImages[i][0], greyImage)
-            
+        
         # plt.imshow(labelImg)
         # plt.show()
-
-        # For the pathogen and nuclei images, we do not need to access the 3rd index
-        # of the tuple.
-        images.append((labelImg, greyImage, imagePath))
+        
+        if (postProcess):
+            # Clear border elements.
+            labelImg = clear_border(labelImg)
+        
+        plt.imshow(labelImg)
+        plt.show()
+        images.append([labelImg, greyImage, imagePath])
     return images
 
 # The function below cleans up the segmentation. It removes all labels that are on the
@@ -154,8 +176,6 @@ def label_images_otsu(path, nucleiImages, threshold):
 # Returns:
 #   - alteredImg (numpy array): The cleaned up image.
 def segment_cleanup(alteredImg, greyImage, isCell):
-    # Remove elements on the border. 
-    alteredImg = clear_border(alteredImg)
     
     # We label the image here, so that we can correctly use
     # remove_small_objects and remove_small_holes

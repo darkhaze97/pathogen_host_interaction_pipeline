@@ -2,9 +2,9 @@ import numpy as np
 from skimage import measure
 import matplotlib.pyplot as plt
 
-from .helper import filter_zero_mean_intensity
+from helper import filter_zero_mean_intensity
 
-from .voronoi import voronoi_seg, voronoi_seg_alt
+from voronoi import voronoi_seg, voronoi_seg_alt
 
 # This function performs the brunt of the cell image correction. It removes nuclei only labels,
 # which are a by-product of combining cell and nuclei labels. In addition, it separates
@@ -75,7 +75,13 @@ def correct_segmentation(labelImg, origCellImg, nucleiImage, newLabelImg):
             # plt.imshow(cellImg)
             # plt.show()
         elif (len(centroidList) > 2):
+            # plt.imshow(cellImg)
+            # plt.show()
             cellImg = voronoi_seg(centroidList, cellImg)
+            # plt.imshow(cellImg)
+            # plt.show()
+            # plt.imshow(nucleiBox)
+            # plt.show()
             cellImg = correct_voronoi(cellImg, nucleiBox)
             # plt.imshow(cellImg)
             # plt.show()
