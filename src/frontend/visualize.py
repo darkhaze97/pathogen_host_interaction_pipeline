@@ -10,6 +10,7 @@ import tkinter as tk
 from PIL import Image, ImageTk
 import numpy as np
 import matplotlib.pyplot as plt
+from skimage import measure, segmentation, morphology, color, img_as_ubyte
 
 import ComponentLibrary
 
@@ -45,7 +46,9 @@ def visualize(info):
     # name to an image.
     imgNameMap = {}
     for label, bwImg, path in info['cellImages']:
-        imgNameMap[(path.split('/'))[-1]] = (label, Image.fromarray(bwImg.astype(np.uint8)))
+        imgNameMap[(path.split('/'))[-1]] = (label, img_as_ubyte(bwImg))
+    
+    show_all_labels('A01f00p00d00.tif', imgNameMap)
     
     app = Dash(
         __name__,
@@ -70,18 +73,36 @@ def visualize(info):
         Input("img-select", "value"),
         Input("main-img-filter", "value"))
     def updateCellImg(file_name, filter):
-        # NEXT: If I reselect the already selected filter, then I should simply do nothing
+        # NEXT: If I reselect the already selected filter, then I should deselect.
         print(file_name)
         if (filter == 'show-all'):
-            # Present the labelled image overlapped
-            # For now, just show labelled image.
-            print('Wt')
+            return show_all_labels(file_name, imgNameMap)
         elif (filter == 'show-selected'):
             # Only show label of current selection.
             print('Lol')
-        return imgNameMap[file_name][1]
+        return Image.fromarray(img_as_ubyte(imgNameMap[file_name][1]))
     
     app.run_server(debug=True)
+
+def show_all_labels(imgName, imgNameMap):
+    # For each label, draw a contour line.
+    labelImg = imgNameMap[imgName][0]
+    bwImg = np.copy(imgNameMap[imgName][1])
+    overlay = color.label2rgb(labelImg, bwImg)
+    return Image.fromarray(img_as_ubyte(overlay))
+    # plt.imshow(result_image)
+    # plt.show()
+    # # Obtain the regionprops of each label.
+    # regionInfo = measure.regionprops(labelImg)
+    # for label in regionInfo:
+    #     # Obtain the contours for label. This needs to be done separately for each
+    #     # label, so that the final contours on the image are correctly separated
+    #     # (for adjacent labels)
+    #     labelMap = np.zeros_like(labelImg, dtype='uint8')
+    #     labelMap = (labelImg == label.label).astype(int)
+    #     contours, _ = cv2.findContours(labelMap.astype('uint8'), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    #     cv2.drawContours(bwCpy, [contours[0]], -1, (0, 0, 255), 1)
+    # return bwCpy
 
 def form_pathogen_info(info, index):
     retStr = 'Pathogen number: ' + str(index)

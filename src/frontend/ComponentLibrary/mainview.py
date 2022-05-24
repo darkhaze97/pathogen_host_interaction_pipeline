@@ -6,7 +6,7 @@ import numpy as np
 from .imagebox import imagebox
 
 def mainview(imgNameMap):
-    data = imgNameMap[(list(imgNameMap.keys()))[0]][1]
+    data = Image.fromarray(imgNameMap[(list(imgNameMap.keys()))[0]][1])
     return html.Div(
         [
             imagebox(data),
