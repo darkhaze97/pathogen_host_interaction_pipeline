@@ -4,40 +4,25 @@ from PIL import Image
 import numpy as np
 
 from .imagebox import imagebox
+from .filterimage import filter_seg
+from .table import obtain_table
 
-def mainview(imgNameMap):
+def mainview(imgNameMap, cellInfo):
     data = Image.fromarray(imgNameMap[(list(imgNameMap.keys()))[0]][1])
     return html.Div(
         [
             imagebox(data),
-            filter_seg()
+            filter_seg(),
+            obtain_table(cellInfo)
         ],
         style={
             'margin-left': '18%',
             'width': '82%',
-            'height': '100%'
-        }
+            'height': '100%',
+            'textAlign': 'center'
+        },
     )
     
-def filter_seg():
-    return html.Div(
-        [
-            dbc.RadioItems(
-                id="main-img-filter",
-                className="btn-group",
-                inputClassName="btn-check",
-                labelClassName="btn btn-outline-primary",
-                labelCheckedClassName="active",
-                options = 
-                    [
-                        {'label': 'Show all labels', 'value': 'show-all'},
-                        {'label': 'Show selected labels', 'value': 'show-selected'}
-                    ],
-                value = '',
-           )
-        ],
-        className="radio-group"
-    )
     
     
 # Checkboxes
@@ -49,3 +34,6 @@ def filter_seg():
 #
 
 # At the bottom, show data table
+
+# If I want to show the selected region, I may have to store the label number
+# for each cell in the cellInfo.

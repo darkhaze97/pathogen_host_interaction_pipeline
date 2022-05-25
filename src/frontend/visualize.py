@@ -47,6 +47,8 @@ def visualize(info):
     imgNameMap = {}
     for label, bwImg, path in info['cellImages']:
         imgNameMap[(path.split('/'))[-1]] = (label, img_as_ubyte(bwImg))
+    cellInfo = info['cellInfo']
+    pathogenInfo = info['pathogenInfo']
     
     show_all_labels('A01f00p00d00.tif', imgNameMap)
     
@@ -58,7 +60,7 @@ def visualize(info):
     app.layout = html.Div(
         children=[
             ComponentLibrary.sidebar(imgNameMap),
-            ComponentLibrary.mainview(imgNameMap)
+            ComponentLibrary.mainview(imgNameMap, cellInfo)
 
         ],
         style={
@@ -74,13 +76,13 @@ def visualize(info):
         Input("main-img-filter", "value"))
     def updateCellImg(file_name, filter):
         # NEXT: If I reselect the already selected filter, then I should deselect.
-        print(file_name)
         if (filter == 'show-all'):
             return show_all_labels(file_name, imgNameMap)
         elif (filter == 'show-selected'):
             # Only show label of current selection.
             print('Lol')
-        return Image.fromarray(img_as_ubyte(imgNameMap[file_name][1]))
+        elif (filter == 'no-labels'):
+            return Image.fromarray(img_as_ubyte(imgNameMap[file_name][1]))
     
     app.run_server(debug=True)
 
@@ -90,19 +92,6 @@ def show_all_labels(imgName, imgNameMap):
     bwImg = np.copy(imgNameMap[imgName][1])
     overlay = color.label2rgb(labelImg, bwImg)
     return Image.fromarray(img_as_ubyte(overlay))
-    # plt.imshow(result_image)
-    # plt.show()
-    # # Obtain the regionprops of each label.
-    # regionInfo = measure.regionprops(labelImg)
-    # for label in regionInfo:
-    #     # Obtain the contours for label. This needs to be done separately for each
-    #     # label, so that the final contours on the image are correctly separated
-    #     # (for adjacent labels)
-    #     labelMap = np.zeros_like(labelImg, dtype='uint8')
-    #     labelMap = (labelImg == label.label).astype(int)
-    #     contours, _ = cv2.findContours(labelMap.astype('uint8'), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    #     cv2.drawContours(bwCpy, [contours[0]], -1, (0, 0, 255), 1)
-    # return bwCpy
 
 def form_pathogen_info(info, index):
     retStr = 'Pathogen number: ' + str(index)
